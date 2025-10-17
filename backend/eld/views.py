@@ -1,4 +1,3 @@
-# backend/eld/views.py
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -10,7 +9,6 @@ class DailyLogViewSet(viewsets.ModelViewSet):
     serializer_class = DailyLogSerializer
     permission_classes = [permissions.IsAuthenticated]
     
-    # ⭐️ AJOUTER ce queryset par défaut
     def get_queryset(self):
         user = self.request.user
         if user.user_type == 'driver':
@@ -20,7 +18,14 @@ class DailyLogViewSet(viewsets.ModelViewSet):
         return DailyLog.objects.none()
     
     def perform_create(self, serializer):
-        serializer.save(driver=self.request.user)
+        # Remplir automatiquement les champs requis
+        user = self.request.user
+        serializer.save(
+            driver=user,
+            carrier=user.company,
+            main_office_address=user.company.main_office_address,
+            home_terminal_address=getattr(user.driverprofile, 'home_terminal_address', '')
+        )
     
     @action(detail=True, methods=['post'])
     def certify(self, request, pk=None):
@@ -48,17 +53,27 @@ class DailyLogViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def today(self, request):
-        """Récupérer le journal d'aujourd'hui"""
+        """Récupérer ou créer le journal d'aujourd'hui"""
         today = timezone.now().date()
-        daily_log, created = DailyLog.objects.get_or_create(
-            driver=request.user,
-            date=today,
-            defaults={
-                'carrier': request.user.company,
-                'main_office_address': request.user.company.main_office_address,
-                'home_terminal_address': getattr(request.user.driverprofile, 'home_terminal_address', ''),
-            }
-        )
+        
+        try:
+            daily_log = DailyLog.objects.get(driver=request.user, date=today)
+        except DailyLog.DoesNotExist:
+            # Créer un nouveau log avec tous les champs requis
+            daily_log = DailyLog.objects.create(
+                driver=request.user,
+                date=today,
+                carrier=request.user.company,
+                main_office_address=request.user.company.main_office_address,
+                home_terminal_address=getattr(request.user.driverprofile, 'home_terminal_address', ''),
+                total_miles_driving_today=0,
+                total_mileage_today=0,
+                vehicle_number="NOT-ASSIGNED",
+                trailer_number="",
+                shipping_documents="",
+                remarks=""
+            )
+        
         serializer = self.get_serializer(daily_log)
         return Response(serializer.data)
     
@@ -74,13 +89,22 @@ class DutyStatusChangeViewSet(viewsets.ModelViewSet):
     serializer_class = DutyStatusChangeSerializer
     permission_classes = [permissions.IsAuthenticated]
     
-    # ⭐️ AJOUTER ce queryset par défaut
     def get_queryset(self):
         return DutyStatusChange.objects.filter(daily_log__driver=self.request.user)
     
     def perform_create(self, serializer):
+        # Associer automatiquement au log du jour
+        today = timezone.now().date()
         daily_log, created = DailyLog.objects.get_or_create(
             driver=self.request.user,
-            date=timezone.now().date()
+            date=today,
+            defaults={
+                'carrier': self.request.user.company,
+                'main_office_address': self.request.user.company.main_office_address,
+                'home_terminal_address': getattr(self.request.user.driverprofile, 'home_terminal_address', ''),
+                'total_miles_driving_today': 0,
+                'total_mileage_today': 0,
+                'vehicle_number': "NOT-ASSIGNED",
+            }
         )
         serializer.save(daily_log=daily_log)

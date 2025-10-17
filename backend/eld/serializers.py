@@ -6,6 +6,7 @@ class DutyStatusChangeSerializer(serializers.ModelSerializer):
     class Meta:
         model = DutyStatusChange
         fields = '__all__'
+        read_only_fields = ('daily_log',)  # ⭐️ AJOUTER cette ligne
 
 class DailyLogSerializer(serializers.ModelSerializer):
     status_changes = DutyStatusChangeSerializer(many=True, read_only=True)
@@ -15,7 +16,11 @@ class DailyLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = DailyLog
         fields = '__all__'
-        read_only_fields = ('is_certified', 'certified_at', 'created_at', 'updated_at')
+        read_only_fields = (
+            'driver', 'carrier', 'main_office_address', 
+            'home_terminal_address', 'is_certified', 'certified_at', 
+            'created_at', 'updated_at'
+        )
 
 class LogCertificationSerializer(serializers.ModelSerializer):
     class Meta:
