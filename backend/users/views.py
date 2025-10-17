@@ -10,10 +10,12 @@ from .serializers import UserSerializer
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def register_user(request):
+    """Inscription utilisateur"""
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
         
+        # Si c'est un driver, créer le profil driver
         if user.user_type == 'driver':
             DriverProfile.objects.create(
                 user=user,
@@ -30,31 +32,58 @@ def register_user(request):
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def login_user(request):
+    """Connexion utilisateur - Version directe"""
     email = request.data.get('email')
     password = request.data.get('password')
     
     try:
         user = CustomUser.objects.get(email=email)
+        
+        # Vérification directe du mot de passe
+        if user.check_password(password):
+            if not user.is_approved and user.user_type == 'driver':
+                return Response({
+                    'error': 'Account pending admin approval'
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            # Générer le token JWT directement
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+                'user': UserSerializer(user).data
+            })
+        else:
+            return Response({
+                'error': 'Invalid credentials'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+            
     except CustomUser.DoesNotExist:
         return Response({
             'error': 'Invalid credentials'
         }, status=status.HTTP_401_UNAUTHORIZED)
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def test_auth(request):
+    """Endpoint de test d'authentification"""
+    email = request.data.get('email')
+    password = request.data.get('password')
     
-    user = authenticate(username=user.username, password=password)
-    
-    if user is not None:
-        if not user.is_approved and user.user_type == 'driver':
-            return Response({
-                'error': 'Account pending admin approval'
-            }, status=status.HTTP_403_FORBIDDEN)
+    try:
+        user = CustomUser.objects.get(email=email)
+        auth_user = authenticate(username=user.username, password=password)
         
-        refresh = RefreshToken.for_user(user)
         return Response({
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-            'user': UserSerializer(user).data
+            'user_found': True,
+            'user_email': user.email,
+            'user_username': user.username,
+            'is_active': user.is_active,
+            'is_approved': user.is_approved,
+            'auth_success': auth_user is not None,
+            'auth_user': auth_user.email if auth_user else None
         })
-    
-    return Response({
-        'error': 'Invalid credentials'
-    }, status=status.HTTP_401_UNAUTHORIZED)
+    except CustomUser.DoesNotExist:
+        return Response({
+            'user_found': False
+        })

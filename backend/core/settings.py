@@ -1,4 +1,3 @@
-# backend/core/settings.py
 import os
 from pathlib import Path
 from datetime import timedelta
@@ -28,8 +27,11 @@ INSTALLED_APPS = [
     'corsheaders',
     'drf_yasg',
     
-    # Custom apps - SEULEMENT users pour commencer
+    # Custom apps - AJOUTER 'eld' ICI
     'users',
+    'eld',
+    'trips', 
+    'hos',
 ]
 
 MIDDLEWARE = [
@@ -98,3 +100,7 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+]
