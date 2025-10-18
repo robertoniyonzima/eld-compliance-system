@@ -2,8 +2,11 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
+from rest_framework.views import APIView
 from .models import Trip, Location
 from .serializers import TripSerializer, TripCreateSerializer, LocationSerializer
+from .pdf_generator import TripPDFGenerator 
+from django.http import HttpResponse
 
 class TripViewSet(viewsets.ModelViewSet):
     serializer_class = TripSerializer
@@ -127,7 +130,83 @@ class TripViewSet(viewsets.ModelViewSet):
         
         return Response({'message': 'Trip completed successfully'})
 
+    @action(detail=True, methods=['get'])
+    def pdf(self, request, pk=None):
+        """Generate trip PDF - Action dans ViewSet"""
+        try:
+            trip = self.get_object()
+            
+            pdf_generator = TripPDFGenerator()
+            pdf_buffer = pdf_generator.generate_trip_pdf(trip)
+            
+            # ✅ Utiliser .getvalue() ou .read()
+            response = HttpResponse(
+                pdf_buffer.getvalue() if hasattr(pdf_buffer, 'getvalue') else pdf_buffer.read(),
+                content_type='application/pdf'
+            )
+            filename = f"trip_{trip.id}_report.pdf"
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            
+            return response
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return HttpResponse(
+                f"Error generating PDF: {str(e)}",
+                status=500,
+                content_type='text/plain'
+            )
+
+
 class LocationViewSet(viewsets.ModelViewSet):
     queryset = Location.objects.all()
     serializer_class = LocationSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+class TripPDFView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request, pk):
+        """Generate working trip PDF"""
+        try:
+            # ✅ Vérifier les permissions selon user_type
+            user = request.user
+            if user.user_type == 'driver':
+                trip = Trip.objects.get(pk=pk, driver=user)
+            elif user.user_type in ['manager', 'admin']:
+                trip = Trip.objects.get(pk=pk, driver__company=user.company)
+            else:
+                return HttpResponse(
+                    "Unauthorized",
+                    status=403,
+                    content_type='text/plain'
+                )
+            
+            pdf_generator = TripPDFGenerator()
+            pdf_buffer = pdf_generator.generate_trip_pdf(trip)
+            
+            # ✅ Utiliser .getvalue() ou .read()
+            response = HttpResponse(
+                pdf_buffer.getvalue() if hasattr(pdf_buffer, 'getvalue') else pdf_buffer.read(),
+                content_type='application/pdf'
+            )
+            filename = f"trip_{trip.id}_report.pdf"
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            
+            return response
+            
+        except Trip.DoesNotExist:
+            return HttpResponse(
+                "Trip not found",
+                status=404,
+                content_type='text/plain'
+            )
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return HttpResponse(
+                f"Error generating PDF: {str(e)}",
+                status=500,
+                content_type='text/plain'
+            )

@@ -9,4 +9,5 @@ router.register(r'duty-status-changes', views.DutyStatusChangeViewSet, basename=
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('daily-logs/<int:pk>/pdf/', views.DailyLogPDFView.as_view(), name='daily-log-pdf'),
 ]

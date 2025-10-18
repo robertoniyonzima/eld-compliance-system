@@ -177,43 +177,84 @@ class Trip(models.Model):
     
     def generate_eld_logs(self):
         """Generate predicted ELD logs for the entire trip"""
-        if not self.route_data or not self.estimated_duration:
-            return None
+        if not self.estimated_duration:
+            return []
         
-        from eld.models import DailyLog
-        
-        logs = []
-        trip_start = self.start_time
-        trip_duration = self.estimated_duration
-        trip_end = trip_start + trip_duration
-        
-        # Create daily logs for each day of the trip
-        current_day = trip_start.date()
-        end_day = trip_end.date()
-        
-        day_count = (end_day - current_day).days + 1
-        
-        for day_offset in range(day_count):
-            log_date = current_day + timedelta(days=day_offset)
-            day_start = datetime.combine(log_date, datetime.min.time()).replace(tzinfo=timezone.utc)
-            day_end = day_start + timedelta(days=1)
+        try:
+            logs = []
+            trip_start = self.start_time
+            trip_duration = self.estimated_duration
+            trip_end = trip_start + trip_duration
             
-            # Calculate driving hours for this day
-            day_driving_hours = self.calculate_driving_hours_for_day(day_start, day_end, trip_start, trip_end)
+            # Create daily logs for each day of the trip
+            current_day = trip_start.date()
+            end_day = trip_end.date()
             
-            # Create predicted log
-            log_data = {
-                'date': log_date.isoformat(),
-                'total_miles_driving_today': int(float(self.total_distance) / day_count),
-                'total_mileage_today': int(float(self.total_distance) / day_count),
-                'estimated_driving_hours': day_driving_hours,
-                'hos_compliance': self.check_day_compliance(day_driving_hours),
-                'breaks_required': day_driving_hours > 8
+            day_count = max(1, (end_day - current_day).days + 1)  # Ensure at least 1 day
+            
+            total_distance = float(self.total_distance) if self.total_distance else 0
+            
+            for day_offset in range(day_count):
+                log_date = current_day + timedelta(days=day_offset)
+                
+                # Calculate driving hours for this day (simplified)
+                if day_count == 1:
+                    day_driving_hours = self.estimated_duration.total_seconds() / 3600
+                else:
+                    # Distribute driving hours across days
+                    day_driving_hours = min(11, (self.estimated_duration.total_seconds() / 3600) / day_count)
+                
+                # Calculate miles for this day (distribute total distance)
+                day_miles = int(total_distance / day_count)
+                
+                # Check compliance for this day
+                compliance = self.check_day_compliance(day_driving_hours)
+                
+                # Create predicted log
+                log_data = {
+                    'date': log_date.isoformat(),
+                    'total_miles_driving_today': day_miles,
+                    'total_mileage_today': day_miles,
+                    'estimated_driving_hours': round(day_driving_hours, 2),
+                    'hos_compliance': compliance,
+                    'breaks_required': day_driving_hours > 8,
+                    'day_number': day_offset + 1,
+                    'total_days': day_count,
+                    'status': 'predicted'
+                }
+                
+                logs.append(log_data)
+            
+            return logs
+            
+        except Exception as e:
+            print(f"Error generating ELD logs: {e}")
+            return []
+
+    def check_day_compliance(self, driving_hours):
+        """Check HOS compliance for a day"""
+        try:
+            total_hours_used = float(self.current_cycle_used) + driving_hours
+            
+            compliance = {
+                '11_hour_rule': driving_hours <= 11,
+                '14_hour_rule': True,  # Simplified - would need actual timing
+                'break_rule': driving_hours <= 8,  # Would need actual break timing
+                '70_hour_rule': total_hours_used <= 70,
+                'total_hours_used': round(total_hours_used, 2),
+                'hours_remaining': round(70 - total_hours_used, 2)
             }
-            
-            logs.append(log_data)
-        
-        return logs
+            return compliance
+        except Exception as e:
+            print(f"Error in compliance check: {e}")
+            return {
+                '11_hour_rule': False,
+                '14_hour_rule': False,
+                'break_rule': False,
+                '70_hour_rule': False,
+                'total_hours_used': 0,
+                'hours_remaining': 70
+            }
     
     def calculate_driving_hours_for_day(self, day_start, day_end, trip_start, trip_end):
         """Calculate driving hours for a specific day"""
