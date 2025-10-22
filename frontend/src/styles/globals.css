@@ -1,0 +1,21 @@
+/* src/styles/globals.css - TAILWIND v4 */
+@import "tailwindcss";
+
+/* Configuration du thème avec @theme (syntaxe v4) */
+@theme {
+  /* Vous pouvez ajouter des customisations ici si besoin */
+}
+
+/* Styles de base - NE PAS utiliser les classes Tailwind ici */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}

@@ -25,3 +25,24 @@ class UserSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
         return user
+
+class UserListSerializer(serializers.ModelSerializer):
+    """Serializer pour la liste des utilisateurs (moins de données sensibles)"""
+    company_name = serializers.CharField(source='company.name', read_only=True)
+    status = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = CustomUser
+        fields = (
+            'id', 'email', 'first_name', 'last_name', 'user_type', 
+            'company_name', 'is_approved', 'is_active', 'date_joined',
+            'last_login', 'phone_number', 'license_number', 'license_state', 'status'
+        )
+    
+    def get_status(self, obj):
+        if not obj.is_approved and obj.user_type == 'driver':
+            return 'pending'
+        elif not obj.is_active:
+            return 'suspended'
+        else:
+            return 'active'
