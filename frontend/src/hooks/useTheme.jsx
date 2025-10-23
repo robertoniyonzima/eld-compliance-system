@@ -1,4 +1,4 @@
-// src/hooks/useTheme.js
+// src/hooks/useTheme.js - VERSION DEBUG
 import { createContext, useContext, useState, useEffect } from 'react';
 
 const ThemeContext = createContext();
@@ -12,53 +12,71 @@ export const useTheme = () => {
 };
 
 export const ThemeProvider = ({ children }) => {
-  // Initialisation synchrone pour éviter le flash
   const [isDark, setIsDark] = useState(() => {
-    // Vérifier localStorage d'abord
+    // Vérifier si on est côté client
+    if (typeof window === 'undefined') return false;
+    
     const saved = localStorage.getItem('eld-theme');
     if (saved !== null) {
+      console.log('📁 Theme from localStorage:', saved);
       return saved === 'dark';
     }
-    // Sinon, utiliser la préférence système
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    console.log('💻 System theme preference:', systemDark ? 'dark' : 'light');
+    return systemDark;
   });
 
+  const [isMounted, setIsMounted] = useState(false);
+
   useEffect(() => {
+    setIsMounted(true);
+    console.log('🎨 ThemeProvider mounted, initial theme:', isDark ? 'dark' : 'light');
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
+
     const root = document.documentElement;
     
-    // Appliquer ou retirer la classe 'dark'
+    console.log('🔄 Applying theme:', isDark ? 'dark' : 'light');
+    
     if (isDark) {
       root.classList.add('dark');
-      root.setAttribute('data-theme', 'dark');
+      root.style.colorScheme = 'dark';
+      console.log('✅ Dark mode applied');
     } else {
       root.classList.remove('dark');
-      root.setAttribute('data-theme', 'light');
+      root.style.colorScheme = 'light';
+      console.log('✅ Light mode applied');
     }
     
     // Sauvegarder la préférence
     localStorage.setItem('eld-theme', isDark ? 'dark' : 'light');
+    console.log('💾 Theme saved to localStorage');
     
-    console.log('🎨 Theme applied:', isDark ? 'dark' : 'light');
-    console.log('📋 HTML classes:', root.className);
-  }, [isDark]);
+  }, [isDark, isMounted]);
 
-  // Écouter les changements de préférence système (optionnel)
+  // Écouter les changements de préférence système
   useEffect(() => {
+    if (!isMounted) return;
+
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     
     const handleChange = (e) => {
-      // Ne changer que si l'utilisateur n'a pas de préférence sauvegardée
       const saved = localStorage.getItem('eld-theme');
       if (!saved) {
+        console.log('🖥️ System theme changed to:', e.matches ? 'dark' : 'light');
         setIsDark(e.matches);
       }
     };
 
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
-  }, []);
+  }, [isMounted]);
 
   const toggleTheme = () => {
+    console.log('🔄 Toggling theme from:', isDark ? 'dark' : 'light', 'to:', !isDark ? 'dark' : 'light');
     setIsDark(prev => !prev);
   };
 
@@ -66,7 +84,10 @@ export const ThemeProvider = ({ children }) => {
     isDark,
     toggleTheme,
     currentTheme: isDark ? 'dark' : 'light',
-    setTheme: (theme) => setIsDark(theme === 'dark')
+    setTheme: (theme) => {
+      console.log('🎨 Setting theme to:', theme);
+      setIsDark(theme === 'dark');
+    }
   };
 
   return (

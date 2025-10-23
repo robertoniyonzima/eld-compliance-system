@@ -1,12 +1,72 @@
-/* src/styles/globals.css - TAILWIND v4 */
+/* src/styles/globals.css - AVEC TOUS LES UTILITAIRES */
 @import "tailwindcss";
 
-/* Configuration du thème avec @theme (syntaxe v4) */
-@theme {
-  /* Vous pouvez ajouter des customisations ici si besoin */
+/* Glassmorphism et utilitaires personnalisés */
+.glass-card {
+  @apply bg-white/10 dark:bg-slate-900/10 backdrop-blur-md border border-white/20 dark:border-slate-700/20;
 }
 
-/* Styles de base - NE PAS utiliser les classes Tailwind ici */
+.glass-dark {
+  @apply bg-slate-800/50 backdrop-blur-md border border-slate-700/50;
+}
+
+/* Assurez-vous que toutes les classes dark mode fonctionnent */
+.dark {
+  color-scheme: dark;
+}
+
+/* Couleurs de background explicites */
+.bg-slate-50 { background-color: #e8e6e9; }
+.bg-slate-100 { background-color: #c0d3e6; }
+.bg-slate-200 { background-color: #e2e8f0; }
+.bg-slate-300 { background-color: #cbd5e1; }
+.bg-slate-400 { background-color: #94a3b8; }
+.bg-slate-500 { background-color: #64748b; }
+.bg-slate-600 { background-color: #475569; }
+.bg-slate-700 { background-color: #334155; }
+.bg-slate-800 { background-color: #1e293b; }
+.bg-slate-900 { background-color: #0f172a; }
+
+/* Dark mode backgrounds */
+.dark .dark\:bg-slate-900 { background-color: #0f172a !important; }
+.dark .dark\:bg-slate-800 { background-color: #1e293b !important; }
+.dark .dark\:bg-slate-700 { background-color: #334155 !important; }
+.dark .dark\:bg-slate-600 { background-color: #5986c5 !important; }
+
+/* Couleurs de texte */
+.text-slate-900 { color: #a8c0f7; }
+.text-slate-800 { color: #1e293b; }
+.text-slate-700 { color: #88a0c2; }
+.text-slate-600 { color: #475569; }
+.text-slate-500 { color: #64748b; }
+.text-slate-400 { color: #94a3b8; }
+.text-slate-300 { color: #cbd5e1; }
+.text-slate-200 { color: #e2e8f0; }
+.text-slate-100 { color: #f1f5f9; }
+.text-slate-50 { color: #f8fafc; }
+
+/* Dark mode text colors */
+.dark .dark\:text-white { color: #ffffff !important; }
+.dark .dark\:text-slate-100 { color: #f1f5f9 !important; }
+.dark .dark\:text-slate-200 { color: #e2e8f0 !important; }
+.dark .dark\:text-slate-300 { color: #cbd5e1 !important; }
+.dark .dark\:text-slate-400 { color: #94a3b8 !important; }
+
+/* Borders */
+.border-slate-200 { border-color: #e2e8f0; }
+.border-slate-300 { border-color: #cbd5e1; }
+.border-slate-700 { border-color: #036cff; }
+.border-slate-800 { border-color: #1e293b; }
+
+.dark .dark\:border-slate-700 { border-color: #283b55 !important; }
+.dark .dark\:border-slate-600 { border-color: #021127 !important; }
+
+/* Transitions globales */
+* {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+/* Styles de base */
 html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -14,6 +74,8 @@ html {
 
 body {
   min-height: 100vh;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
 }
 
 #root {

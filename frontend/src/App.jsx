@@ -1,4 +1,4 @@
-// src/App.jsx - SIMPLIFIÉ
+// src/App.jsx - AVEC BACKGROUND FIXE
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { ThemeProvider } from './hooks/useTheme';
@@ -12,7 +12,6 @@ import Admin from './pages/Admin';
 import LoadingSpinner from './components/ui/LoadingSpinner';
 import './styles/globals.css';
 
-
 // Pages dashboard
 const ManagerDashboard = () => (
   <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-8">
@@ -21,19 +20,12 @@ const ManagerDashboard = () => (
   </div>
 );
 
-const AdminDashboard = () => (
-  <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-8">
-    <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Admin Dashboard</h1>
-    <p className="text-slate-600 dark:text-slate-400">Administration panel</p>
-  </div>
-);
-
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { user, loading } = useAuth();
   
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <LoadingSpinner size="large" />
       </div>
     );
@@ -44,7 +36,6 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   }
   
   if (requiredRole && user.user_type !== requiredRole) {
-    // Rediriger vers le dashboard approprié selon le rôle
     const userDashboard = getUserDashboardRoute(user.user_type);
     return <Navigate to={userDashboard} replace />;
   }
@@ -52,7 +43,6 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   return children;
 };
 
-// Fonction utilitaire pour les routes de dashboard
 const getUserDashboardRoute = (userType) => {
   switch (userType) {
     case 'admin': return '/admin';
@@ -62,7 +52,6 @@ const getUserDashboardRoute = (userType) => {
   }
 };
 
-// Composant de redirection automatique
 const DashboardRedirect = () => {
   const { user } = useAuth();
   
@@ -77,14 +66,10 @@ const DashboardRedirect = () => {
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* Routes publiques */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
-      
-      {/* Route racine - redirection automatique */}
       <Route path="/" element={<DashboardRedirect />} />
       
-      {/* Dashboards par rôle */}
       <Route 
         path="/driver" 
         element={
@@ -110,7 +95,6 @@ const AppRoutes = () => {
         } 
       />
       
-      {/* Routes fonctionnelles */}
       <Route 
         path="/logs" 
         element={
@@ -136,7 +120,6 @@ const AppRoutes = () => {
         } 
       />
       
-      {/* Fallback pour routes inexistantes */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -147,8 +130,8 @@ function App() {
     <Router>
       <ThemeProvider>
         <AuthProvider>
-          {/* Supprime la classe ici, laisse le thème gérer le background */}
-          <div className="App min-h-screen">
+          {/* ⭐ BACKGROUND FIXE POUR TOUTE L'APPLICATION */}
+          <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
             <AppRoutes />
           </div>
         </AuthProvider>

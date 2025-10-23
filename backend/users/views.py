@@ -42,6 +42,12 @@ def login_user(request):
         
         # Vérification directe du mot de passe
         if user.check_password(password):
+            # verification of status
+            if not user.is_active:
+                return Response({
+                    'error': 'Account suspended. Please contact administrator.'
+                }, status=status.HTTP_403_FORBIDDEN)
+
             if not user.is_approved and user.user_type == 'driver':
                 return Response({
                     'error': 'Account pending admin approval'

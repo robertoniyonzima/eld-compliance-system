@@ -1,11 +1,92 @@
+# trips/models.py - MODÈLE COMPLET
 from django.db import models
-from users.models import CustomUser, DriverProfile
+from users.models import CustomUser
 from django.core.validators import MinValueValidator, MaxValueValidator
 import requests
 import json
 from datetime import timedelta, datetime
 from django.utils import timezone
-from hos.models import HOSRuleEngine
+from math import radians, sin, cos, sqrt, atan2
+
+class CityCoordinate(models.Model):
+    """Table complète pour coordonnées de toutes les villes principales US"""
+    city = models.CharField(max_length=100)
+    state = models.CharField(max_length=2)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6)
+    
+    class Meta:
+        db_table = 'city_coordinates'
+        indexes = [
+            models.Index(fields=['city', 'state']),
+            models.Index(fields=['state']),
+        ]
+    
+
+    @classmethod
+    def get_coordinates(cls, city, state):
+        """Trouve les coordonnées avec recherche améliorée"""
+        try:
+            city_clean = city.strip().lower() if city else ""
+            state_clean = state.strip().upper() if state else ""
+            
+            # 1. Recherche exacte ville+état
+            coord = cls.objects.filter(
+                city__iexact=city_clean, 
+                state__iexact=state_clean
+            ).first()
+            
+            if coord:
+                return float(coord.latitude), float(coord.longitude)
+                
+            # 2. Recherche partielle de ville (pour les noms similaires)
+            if city_clean:
+                coord = cls.objects.filter(
+                    city__icontains=city_clean,
+                    state__iexact=state_clean
+                ).first()
+                if coord:
+                    return float(coord.latitude), float(coord.longitude)
+                    
+            # 3. Capitale de l'état
+            coord = cls.objects.filter(
+                state__iexact=state_clean
+            ).first()
+            if coord:
+                return float(coord.latitude), float(coord.longitude)
+                
+        except Exception as e:
+            print(f"Coordinate lookup error for {city}, {state}: {e}")
+        
+        # 4. Fallback vers le centre de l'état
+        return cls.get_state_center(state_clean)
+
+    @classmethod
+    def get_state_center(cls, state):
+        """Retourne le centre géographique de l'état"""
+        state_centers = {
+            'AL': [32.8065, -86.7911], 'AK': [61.3850, -152.2683], 'AZ': [33.7298, -111.4312],
+            'AR': [34.9697, -92.3731], 'CA': [36.1162, -119.6816], 'CO': [39.0598, -105.3111],
+            'CT': [41.5928, -72.6505], 'DE': [39.3185, -75.5071], 'FL': [27.7663, -81.6868],
+            'GA': [33.0406, -83.6431], 'HI': [21.0943, -157.4983], 'ID': [44.2405, -114.4788],
+            'IL': [40.3495, -88.9861], 'IN': [39.8494, -86.2583], 'IA': [42.0115, -93.2105],
+            'KS': [38.5266, -96.7265], 'KY': [37.6681, -84.6701], 'LA': [31.1695, -91.8678],
+            'ME': [44.6939, -69.3819], 'MD': [39.0639, -76.8021], 'MA': [42.2302, -71.5301],
+            'MI': [43.3266, -84.5361], 'MN': [45.6945, -93.9002], 'MS': [32.7416, -89.6787],
+            'MO': [38.4561, -92.2884], 'MT': [46.9219, -110.4544], 'NE': [41.1254, -98.2681],
+            'NV': [38.4864, -117.0701], 'NH': [43.4525, -71.5639], 'NJ': [40.2989, -74.5210],
+            'NM': [34.8405, -106.2485], 'NY': [42.1657, -74.9481], 'NC': [35.6301, -79.8064],
+            'ND': [47.5289, -99.7840], 'OH': [40.3888, -82.7649], 'OK': [35.5653, -96.9289],
+            'OR': [44.5720, -122.0709], 'PA': [40.5908, -77.2098], 'RI': [41.6809, -71.5118],
+            'SC': [33.8569, -80.9450], 'SD': [44.2998, -99.4388], 'TN': [35.7478, -86.6923],
+            'TX': [31.0545, -97.5635], 'UT': [40.1500, -111.8624], 'VT': [44.0459, -72.7107],
+            'VA': [37.7693, -78.1700], 'WA': [47.4009, -121.4905], 'WV': [38.4912, -80.9545],
+            'WI': [44.2685, -89.6165], 'WY': [42.7560, -107.3025], 'DC': [38.8974, -77.0268]
+        }
+        return state_centers.get(state, [39.8283, -98.5795])  # Centre USA par défaut
+
+    def __str__(self):
+        return f"{self.city}, {self.state.upper()}"
 
 class Location(models.Model):
     address = models.TextField()
@@ -16,26 +97,68 @@ class Location(models.Model):
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     
     def get_coordinates(self):
-        """Get coordinates using OpenStreetMap Nominatim (free)"""
-        if not self.latitude or not self.longitude:
-            try:
-                # Use OpenStreetMap Nominatim for geocoding
-                import geopy
-                from geopy.geocoders import Nominatim
-                from geopy.exc import GeocoderTimedOut
-                
-                geolocator = Nominatim(user_agent="eld_system_trips")
-                location = geolocator.geocode(f"{self.address}, {self.city}, {self.state} {self.zip_code}")
-                
-                if location:
-                    self.latitude = location.latitude
-                    self.longitude = location.longitude
-                    self.save()
-                    return self.latitude, self.longitude
-            except Exception as e:
-                print(f"Geocoding error for {self.address}: {e}")
+        """Get coordinates with robust fallback system"""
+        # 1. Si on a déjà les coordonnées, les retourner
+        if self.latitude and self.longitude:
+            return float(self.latitude), float(self.longitude)
         
-        return self.latitude, self.longitude
+        # 2. ESSAYER le géocoding externe (timeout court)
+        try:
+            from geopy.geocoders import Nominatim
+            geolocator = Nominatim(user_agent="eld_system_trips", timeout=3)
+            location = geolocator.geocode(f"{self.city}, {self.state}, USA")
+            
+            if location:
+                self.latitude = location.latitude
+                self.longitude = location.longitude
+                self.save()
+                print(f"Geocoding success for {self.city}, {self.state}")
+                return self.latitude, self.longitude
+        except Exception as e:
+            print(f"Geocoding error for {self.city}, {self.state}: {e}")
+    
+        # 3. FALLBACK: Base de données locale
+        try:
+            lat, lng = CityCoordinate.get_coordinates(self.city, self.state)
+            if lat and lng:
+                print(f"Using local coordinates for {self.city}, {self.state}")
+                self.latitude = lat
+                self.longitude = lng
+                self.save()
+                return lat, lng
+        except Exception as e:
+            print(f"Local coordinate fallback error: {e}")
+    
+        # 4. FALLBACK FINAL: Centre de l'état
+        default_coords = self.get_state_center()
+        print(f"Using state center for {self.state}: {default_coords}")
+        self.latitude = default_coords[0]
+        self.longitude = default_coords[1]
+        self.save()
+        return default_coords
+
+    def get_state_center(self):
+        """Retourne le centre géographique de l'état"""
+        state_centers = {
+            'AL': [32.8065, -86.7911], 'AK': [61.3850, -152.2683], 'AZ': [33.7298, -111.4312],
+            'AR': [34.9697, -92.3731], 'CA': [36.1162, -119.6816], 'CO': [39.0598, -105.3111],
+            'CT': [41.5928, -72.6505], 'DE': [39.3185, -75.5071], 'FL': [27.7663, -81.6868],
+            'GA': [33.0406, -83.6431], 'HI': [21.0943, -157.4983], 'ID': [44.2405, -114.4788],
+            'IL': [40.3495, -88.9861], 'IN': [39.8494, -86.2583], 'IA': [42.0115, -93.2105],
+            'KS': [38.5266, -96.7265], 'KY': [37.6681, -84.6701], 'LA': [31.1695, -91.8678],
+            'ME': [44.6939, -69.3819], 'MD': [39.0639, -76.8021], 'MA': [42.2302, -71.5301],
+            'MI': [43.3266, -84.5361], 'MN': [45.6945, -93.9002], 'MS': [32.7416, -89.6787],
+            'MO': [38.4561, -92.2884], 'MT': [46.9219, -110.4544], 'NE': [41.1254, -98.2681],
+            'NV': [38.4864, -117.0701], 'NH': [43.4525, -71.5639], 'NJ': [40.2989, -74.5210],
+            'NM': [34.8405, -106.2485], 'NY': [42.1657, -74.9481], 'NC': [35.6301, -79.8064],
+            'ND': [47.5289, -99.7840], 'OH': [40.3888, -82.7649], 'OK': [35.5653, -96.9289],
+            'OR': [44.5720, -122.0709], 'PA': [40.5908, -77.2098], 'RI': [41.6809, -71.5118],
+            'SC': [33.8569, -80.9450], 'SD': [44.2998, -99.4388], 'TN': [35.7478, -86.6923],
+            'TX': [31.0545, -97.5635], 'UT': [40.1500, -111.8624], 'VT': [44.0459, -72.7107],
+            'VA': [37.7693, -78.1700], 'WA': [47.4009, -121.4905], 'WV': [38.4912, -80.9545],
+            'WI': [44.2685, -89.6165], 'WY': [42.7560, -107.3025], 'DC': [38.8974, -77.0268]
+        }
+        return state_centers.get(self.state.upper(), [39.8283, -98.5795])  # Centre USA par défaut
     
     def __str__(self):
         return f"{self.address}, {self.city}, {self.state}"
@@ -72,7 +195,7 @@ class Trip(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     def calculate_route(self):
-        """Calculate route using OSRM API with HOS break planning"""
+        """Calculate route with robust fallback system"""
         try:
             # Get coordinates for all locations
             current_lat, current_lng = self.current_location.get_coordinates()
@@ -80,7 +203,8 @@ class Trip(models.Model):
             dropoff_lat, dropoff_lng = self.dropoff_location.get_coordinates()
             
             if not all([current_lat, current_lng, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng]):
-                raise ValueError("Could not get coordinates for all locations")
+                print("Some coordinates are missing, using fallback calculation")
+                return self.calculate_route_fallback()
             
             # Use OSRM API for route calculation
             coordinates = f"{current_lng},{current_lat};{pickup_lng},{pickup_lat};{dropoff_lng},{dropoff_lat}"
@@ -101,7 +225,8 @@ class Trip(models.Model):
                     'geometry': route['geometry'],
                     'distance': route['distance'],
                     'duration': route['duration'],
-                    'waypoints': data['waypoints']
+                    'waypoints': data['waypoints'],
+                    'source': 'osrm'
                 }
                 
                 # Plan HOS breaks
@@ -110,14 +235,66 @@ class Trip(models.Model):
                 self.save()
                 return data
             else:
-                raise ValueError(f"OSRM API error: {data.get('message', 'Unknown error')}")
+                print(f"OSRM API error, using fallback: {data.get('message', 'Unknown error')}")
+                return self.calculate_route_fallback()
                 
         except Exception as e:
             print(f"Route calculation error: {e}")
-            # Fallback: estimate based on average speed
+            return self.calculate_route_fallback()
+    
+    def calculate_route_fallback(self):
+        """Fallback robuste avec calcul de distance réel"""
+        try:
+            # Récupérer les coordonnées (même approximatives)
+            current_lat, current_lng = self.current_location.get_coordinates()
+            pickup_lat, pickup_lng = self.pickup_location.get_coordinates()
+            dropoff_lat, dropoff_lng = self.dropoff_location.get_coordinates()
+            
+            # Calculer distance avec Haversine
+            def haversine(lat1, lon1, lat2, lon2):
+                R = 3958.8  # Earth radius in miles
+                dlat = radians(lat2 - lat1)
+                dlon = radians(lon2 - lon1)
+                a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
+                c = 2 * atan2(sqrt(a), sqrt(1-a))
+                return R * c
+            
+            # Distances réelles
+            dist1 = haversine(current_lat, current_lng, pickup_lat, pickup_lng)
+            dist2 = haversine(pickup_lat, pickup_lng, dropoff_lat, dropoff_lng)
+            total_distance = dist1 + dist2
+            
+            # Durée estimée (55 mph moyenne)
+            total_duration = total_distance / 55  # en heures
+            
+            self.total_distance = round(total_distance, 1)
+            self.estimated_duration = timedelta(hours=total_duration)
+            
+            # Stocker les données de route simplifiées
+            self.route_data = {
+                'fallback': True,
+                'distance': total_distance,
+                'duration': total_duration,
+                'coordinates': {
+                    'current': [current_lat, current_lng],
+                    'pickup': [pickup_lat, pickup_lng],
+                    'dropoff': [dropoff_lat, dropoff_lng]
+                },
+                'source': 'haversine_fallback'
+            }
+            
+            # Plan HOS breaks
+            self.plan_hos_breaks()
+            
+            self.save()
+            return self.route_data
+            
+        except Exception as e:
+            print(f"Fallback route calculation error: {e}")
+            # Dernier fallback ultra-basique
             self.estimate_route_fallback()
             return None
-    
+
     def estimate_route_fallback(self):
         """Fallback route estimation when OSRM is unavailable"""
         # Simple estimation: 50 mph average speed
@@ -126,7 +303,7 @@ class Trip(models.Model):
         self.estimated_duration = timedelta(hours=estimated_hours)
         self.plan_hos_breaks()
         self.save()
-    
+
     def plan_hos_breaks(self):
         """Plan HOS breaks based on trip duration and current cycle"""
         if not self.estimated_duration:
@@ -174,7 +351,7 @@ class Trip(models.Model):
         else:
             self.requires_breaks = False
             self.waypoints = []
-    
+
     def generate_eld_logs(self):
         """Generate predicted ELD logs for the entire trip"""
         if not self.estimated_duration:
@@ -255,26 +432,7 @@ class Trip(models.Model):
                 'total_hours_used': 0,
                 'hours_remaining': 70
             }
-    
-    def calculate_driving_hours_for_day(self, day_start, day_end, trip_start, trip_end):
-        """Calculate driving hours for a specific day"""
-        # Simplified calculation - in real app, use actual route timing
-        day_duration = min(day_end, trip_end) - max(day_start, trip_start)
-        day_hours = day_duration.total_seconds() / 3600
-        
-        # Assume 80% of time is driving
-        return max(0, min(11, day_hours * 0.8))  # Cap at 11 hours driving
-    
-    def check_day_compliance(self, driving_hours):
-        """Check HOS compliance for a day"""
-        compliance = {
-            '11_hour_rule': driving_hours <= 11,
-            '14_hour_rule': True,  # Simplified
-            'break_rule': driving_hours <= 8,  # Would need actual break timing
-            '70_hour_rule': (float(self.current_cycle_used) + driving_hours) <= 70
-        }
-        return compliance
-    
+
     def get_trip_summary(self):
         """Get comprehensive trip summary"""
         return {
