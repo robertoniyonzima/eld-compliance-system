@@ -1,15 +1,33 @@
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
-from reportlab.lib.colors import black, white, grey
+from reportlab.lib.colors import black, white, grey, Color
 import io
 from datetime import datetime
+from django.utils import timezone
+import pytz
+
+# ✅ Define colors for each duty status
+OFF_DUTY_COLOR = Color(0.7, 0.7, 0.7)      # Light grey
+SLEEPER_BERTH_COLOR = Color(0.4, 0.6, 0.9) # Light blue
+DRIVING_COLOR = Color(0.2, 0.7, 0.3)       # Green
+ON_DUTY_COLOR = Color(0.9, 0.6, 0.2)       # Orange
 
 class FMCSAPDFGenerator:
     """
     Générateur PDF exact du formulaire FMCSA Driver's Daily Log
     Reproduction fidèle pixel par pixel
     """
+    
+    def __init__(self, user_timezone=None):
+        """Initialize PDF generator - timezone conversion removed"""
+        # ✅ NO TIMEZONE CONVERSION - Use times as stored in database
+        pass
+    
+    def to_local_time(self, dt):
+        """Return datetime as-is (already in correct timezone from frontend)"""
+        # ✅ NO CONVERSION - Frontend sends correct local time
+        return dt
     
     def generate_daily_log_pdf(self, daily_log):
         """Generate EXACT FMCSA form PDF"""
@@ -76,8 +94,14 @@ class FMCSAPDFGenerator:
         y -= 20
         pdf.line(0.5*inch, y, 8.0*inch, y)
         
-        # Texte 24 hours
+        # ✅ Driver Name
         y -= 15
+        pdf.setFont("Helvetica-Bold", 10)
+        driver_name = f"{daily_log.driver.first_name} {daily_log.driver.last_name}"
+        pdf.drawString(0.5*inch, y, f"Driver: {driver_name}")
+        
+        # Texte 24 hours
+        y -= 12
         pdf.setFont("Helvetica", 9)
         pdf.drawString(0.5*inch, y, "(24 hours)")
         
@@ -89,19 +113,30 @@ class FMCSAPDFGenerator:
         return y - 20
     
     def _draw_from_section(self, pdf, daily_log, y):
-        """Section FROM et TO sur la même ligne"""
+        """Section FROM et TO sur la même ligne - WITH TRIP DATA"""
         pdf.setFont("Helvetica-Bold", 10)
 
         # From
         pdf.drawString(0.5 * inch, y, "From:")
         pdf.line(1.0 * inch, y - 2, 4.0 * inch, y - 2)
-
+        
+        # Display FROM location
+        if daily_log.from_location:
+            pdf.setFont("Helvetica", 9)
+            pdf.drawString(1.0 * inch, y - 15, daily_log.from_location[:40])
+        
         # To
+        pdf.setFont("Helvetica-Bold", 10)
         pdf.drawString(4.5 * inch, y, "To:")
         pdf.line(5.0 * inch, y - 2, 8.0 * inch, y - 2)
+        
+        # ✅ Display TO location
+        if daily_log.to_location:
+            pdf.setFont("Helvetica", 9)
+            pdf.drawString(5.0 * inch, y - 15, daily_log.to_location[:40])
 
         # Retourner le Y ajusté pour la suite
-        return y - 25
+        return y - 30
 
     
     def _draw_main_info_table(self, pdf, daily_log, y):
@@ -300,8 +335,39 @@ class FMCSAPDFGenerator:
             self._draw_total_hours(pdf, daily_log, total_col_x + 5, grid_top, row_height)
             self._fill_grid_with_status_data(pdf, daily_log, grid_top, grid_x, hour_width, row_height)
             
-            return grid_top - grid_height - 20
+            # ✅ Draw color legend
+            legend_y = grid_top - grid_height - 30
+            self._draw_color_legend(pdf, grid_x, legend_y)
+            
+            return legend_y - 20
 
+    
+    def _draw_color_legend(self, pdf, x, y):
+        """✅ Draw color legend for duty statuses"""
+        pdf.setFont("Helvetica-Bold", 8)
+        pdf.setFillColor(black)
+        pdf.drawString(x, y, "Color Legend:")
+        
+        # Legend items
+        legend_items = [
+            ("Off Duty", OFF_DUTY_COLOR),
+            ("Sleeper Berth", SLEEPER_BERTH_COLOR),
+            ("Driving", DRIVING_COLOR),
+            ("On Duty", ON_DUTY_COLOR)
+        ]
+        
+        x_offset = x + 1.2 * inch
+        for i, (label, color) in enumerate(legend_items):
+            item_x = x_offset + (i * 1.5 * inch)
+            
+            # Draw colored box
+            pdf.setFillColor(color)
+            pdf.rect(item_x, y - 3, 0.3 * inch, 8, fill=1, stroke=1)
+            
+            # Draw label
+            pdf.setFillColor(black)
+            pdf.setFont("Helvetica", 7)
+            pdf.drawString(item_x + 0.35 * inch, y, label)
     
     def _draw_total_hours(self, pdf, daily_log, x, y_start, row_height):
         """Afficher les totaux d'heures pour chaque statut"""
@@ -334,7 +400,7 @@ class FMCSAPDFGenerator:
             print(f"Erreur calcul totaux: {e}")
     
     def _fill_grid_with_status_data(self, pdf, daily_log, grid_top, grid_x, hour_width, row_height):
-        """Remplir la grille avec les changements de statut réels"""
+        """✅ Fill grid with status data - OFF DUTY from midnight to first status"""
         try:
             status_changes = daily_log.status_changes.all().order_by('start_time')
             
@@ -345,38 +411,94 @@ class FMCSAPDFGenerator:
                 'on_duty': 3
             }
             
-            pdf.setFillColor(black)
+            # ✅ STEP 1: Draw OFF DUTY from midnight (00:00) to first status change
+            if status_changes.exists():
+                first_change = status_changes.first()
+                first_start = self.to_local_time(first_change.start_time)
+                first_hour = first_start.hour
+                first_minute = first_start.minute
+                
+                # Calculate duration from midnight to first status
+                duration_from_midnight = first_hour + first_minute/60
+                
+                if duration_from_midnight > 0:
+                    # Draw OFF DUTY line from midnight
+                    off_duty_row_idx = status_to_row['off_duty']
+                    x_start = grid_x + 1
+                    y_off_duty = grid_top - (off_duty_row_idx * row_height) - (row_height / 2)
+                    
+                    # ✅ Calculate width - ensure it doesn't exceed grid width
+                    width_off_duty = (duration_from_midnight * hour_width) - 2
+                    max_width = (24 * hour_width) - 2  # Maximum grid width
+                    width_off_duty = min(width_off_duty, max_width)
+                    
+                    pdf.setFillColor(OFF_DUTY_COLOR)  # Light grey for Off Duty
+                    pdf.rect(x_start, y_off_duty - 5, width_off_duty, 10, fill=1, stroke=0)
+                    
+                    # ✅ Save end position for connecting line
+                    off_duty_end_x = x_start + width_off_duty
+                    off_duty_y = y_off_duty
+                else:
+                    off_duty_end_x = None
+                    off_duty_y = None
+            else:
+                off_duty_end_x = None
+                off_duty_y = None
             
+            # ✅ STEP 2: Draw all status changes (NO CONNECTING LINES)
             for change in status_changes:
                 if change.status in status_to_row:
                     row_idx = status_to_row[change.status]
-                    start_hour = change.start_time.hour
-                    start_minute = change.start_time.minute
                     
-                    # Position dans la grille
+                    # Get times (no conversion needed)
+                    start_local = self.to_local_time(change.start_time)
+                    start_hour = start_local.hour
+                    start_minute = start_local.minute
+                    
+                    # Position in grid
                     x_offset = (start_hour + start_minute/60) * hour_width
                     x = grid_x + x_offset + 1
                     y = grid_top - (row_idx * row_height) - (row_height / 2)
                     
-                    # Durée
+                    # Duration calculation
                     duration = 1
                     if change.end_time:
-                        end_hour = change.end_time.hour
-                        end_minute = change.end_time.minute
+                        end_local = self.to_local_time(change.end_time)
+                        end_hour = end_local.hour
+                        end_minute = end_local.minute
                         duration = (end_hour + end_minute/60) - (start_hour + start_minute/60)
+                        
+                        # Handle overnight duration
+                        if duration < 0:
+                            duration = 24 + duration
                         duration = max(0.1, duration)
                     
                     width = (duration * hour_width) - 2
-                    height = 8
+                    height = 10
                     
-                    # Remplir la période
-                    pdf.rect(x, y - 4, width, height, fill=1, stroke=0)
+                    # ✅ Ensure width doesn't exceed grid boundary
+                    grid_end = grid_x + (24 * hour_width)
+                    if x + width > grid_end:
+                        width = grid_end - x - 2
+                    width = max(0.1 * hour_width, width)  # Minimum visible width
+                    
+                    # ✅ Set color based on status
+                    status_colors = {
+                        'off_duty': OFF_DUTY_COLOR,        # Light grey
+                        'sleeper_berth': SLEEPER_BERTH_COLOR,  # Light blue
+                        'driving': DRIVING_COLOR,          # Green
+                        'on_duty': ON_DUTY_COLOR           # Orange
+                    }
+                    pdf.setFillColor(status_colors.get(change.status, black))
+                    
+                    # Draw horizontal line for status duration
+                    pdf.rect(x, y - 5, width, height, fill=1, stroke=0)
                     
         except Exception as e:
             print(f"Erreur lors du remplissage de la grille: {e}")
     
     def _draw_remarks_section(self, pdf, daily_log, y):
-        """Section Remarks"""
+        """Section Remarks - INCLUDES ON DUTY NOTES"""
         pdf.setFont("Helvetica-Bold", 10)
         pdf.drawString(0.5*inch, y, "Remarks")
         
@@ -384,13 +506,40 @@ class FMCSAPDFGenerator:
         y -= 15
         pdf.line(0.5*inch, y, 8.0*inch, y)
         
-        # Contenu des remarks
-        if daily_log.remarks:
-            y -= 15
-            pdf.setFont("Helvetica", 9)
-            pdf.drawString(0.5*inch, y, daily_log.remarks[:90])
+        # ✅ Collect On Duty notes from status changes
+        on_duty_notes = []
+        try:
+            status_changes = daily_log.status_changes.filter(status='on_duty').order_by('start_time')
+            for change in status_changes:
+                if change.notes and change.notes.strip():
+                    # ✅ Convert to local time
+                    start_local = self.to_local_time(change.start_time)
+                    time_str = start_local.strftime("%H:%M")
+                    location = change.location or "Unknown"
+                    on_duty_notes.append(f"{time_str} - {location}: {change.notes}")
+        except Exception as e:
+            print(f"Error collecting On Duty notes: {e}")
         
-        return y - 20
+        # Contenu des remarks
+        y -= 15
+        pdf.setFont("Helvetica", 9)
+        
+        # Display general remarks first
+        if daily_log.remarks:
+            pdf.drawString(0.5*inch, y, daily_log.remarks[:90])
+            y -= 12
+        
+        # ✅ Display On Duty activities
+        if on_duty_notes:
+            pdf.setFont("Helvetica-Bold", 8)
+            pdf.drawString(0.5*inch, y, "On Duty Activities:")
+            y -= 12
+            pdf.setFont("Helvetica", 8)
+            for note in on_duty_notes[:5]:  # Limit to 5 entries
+                pdf.drawString(0.6*inch, y, note[:85])
+                y -= 10
+        
+        return y - 10
     
     def _draw_shipping_section(self, pdf, daily_log, y):
         """Section Shipping Documents"""

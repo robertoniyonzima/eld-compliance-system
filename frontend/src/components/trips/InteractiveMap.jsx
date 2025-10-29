@@ -33,18 +33,23 @@ const InteractiveMap = ({ tripData, onDistanceCalculated }) => {
   const [loading, setLoading] = useState(false);
   const mapRef = useRef();
 
-  // Safe trip data
-  const safeTripData = tripData || {
+  // Safe trip data - Support both formats (location and location_details)
+  const safeTripData = tripData ? {
+    current_location: tripData.current_location_details || tripData.current_location || { address: '', city: '', state: '', zip_code: '' },
+    pickup_location: tripData.pickup_location_details || tripData.pickup_location || { address: '', city: '', state: '', zip_code: '' },
+    dropoff_location: tripData.dropoff_location_details || tripData.dropoff_location || { address: '', city: '', state: '', zip_code: '' }
+  } : {
     current_location: { address: '', city: '', state: '', zip_code: '' },
     pickup_location: { address: '', city: '', state: '', zip_code: '' },
     dropoff_location: { address: '', city: '', state: '', zip_code: '' }
   };
 
-  console.log('🗺️ InteractiveMap received tripData:', safeTripData);
+  console.log('🗺️ InteractiveMap received tripData:', tripData);
+  console.log('🗺️ Processed safeTripData:', safeTripData);
 
   // Calculate route when tripData changes
   useEffect(() => {
-    console.log('🔄 useEffect triggered with tripData:', safeTripData);
+    console.log('🔄 useEffect triggered with tripData:', tripData);
     
     if (hasValidTripData(safeTripData)) {
       console.log('✅ Valid trip data, calculating route...');
@@ -52,7 +57,7 @@ const InteractiveMap = ({ tripData, onDistanceCalculated }) => {
     } else {
       console.log('❌ Invalid trip data, skipping route calculation');
     }
-  }, [safeTripData]);
+  }, [tripData]);
 
   const hasValidTripData = (data) => {
     if (!data) return false;
@@ -102,13 +107,24 @@ const InteractiveMap = ({ tripData, onDistanceCalculated }) => {
 
       setMarkers(coordinates);
 
-      // Calculate distances
-      const currentToPickup = calculateDistance(coordinates.current, coordinates.pickup);
-      const pickupToDropoff = calculateDistance(coordinates.pickup, coordinates.dropoff);
-      const totalDistance = Math.round(currentToPickup + pickupToDropoff);
-
-      // Calculate duration (55 mph average)
-      const totalDuration = Math.round((totalDistance / 55) * 10) / 10;
+      // Use backend distance if available, otherwise calculate
+      let totalDistance, totalDuration;
+      
+      if (tripData?.total_distance && tripData?.estimated_duration_seconds) {
+        // Use backend calculated values
+        totalDistance = Math.round(tripData.total_distance);
+        totalDuration = Math.round((tripData.estimated_duration_seconds / 3600) * 10) / 10;
+        console.log('✅ Using BACKEND distance and duration');
+      } else {
+        // Calculate distances
+        const currentToPickup = calculateDistance(coordinates.current, coordinates.pickup);
+        const pickupToDropoff = calculateDistance(coordinates.pickup, coordinates.dropoff);
+        totalDistance = Math.round(currentToPickup + pickupToDropoff);
+        
+        // Calculate duration (55 mph average)
+        totalDuration = Math.round((totalDistance / 55) * 10) / 10;
+        console.log('⚠️ Using FRONTEND calculated distance and duration');
+      }
 
       console.log('📏 Total distance:', totalDistance, 'miles');
       console.log('⏱️ Total duration:', totalDuration, 'hours');

@@ -1,11 +1,14 @@
-// src/pages/Admin.jsx - VERSION SPÉCIALISÉE
+// src/pages/Admin.jsx - PROFESSIONAL VERSION
 import { useState, useEffect } from 'react';
 import Navbar from '../components/layout/Navbar';
 import Sidebar from '../components/layout/Sidebar';
 import AdminStatsCards from '../components/admin/AdminStatsCards';
 import UserManagement from '../components/admin/UserManagement';
-import PlatformAnalytics from '../components/admin/PlatformAnalytics';
+import PlatformAnalytics from '../components/admin/PlatformAnalyticsReal';
 import RealTimeMonitoring from '../components/admin/RealTimeMonitoring';
+import TripsManagement from '../components/shared/TripsManagement';
+import DocumentsManagement from '../components/manager/DocumentsManagement';
+import Icon from '../components/ui/Icon';
 
 const Admin = () => {
   const [activeTab, setActiveTab] = useState('users');
@@ -16,31 +19,51 @@ const Admin = () => {
     activeTrips: 0
   });
 
-  // Données simulées - À remplacer par l'API
+  // Load real stats from API
   useEffect(() => {
-    // Simulation de données dynamiques
-    const mockStats = {
-      totalUsers: 1247,
-      pendingApprovals: 23,
-      onlineUsers: 89,
-      activeTrips: 45
-    };
-    setStats(mockStats);
-
-    // Simulation de mises à jour en temps réel
+    loadStats();
+    
+    // Refresh every 30 seconds
     const interval = setInterval(() => {
-      setStats(prev => ({
-        ...prev,
-        onlineUsers: Math.floor(Math.random() * 50) + 70,
-        activeTrips: Math.floor(Math.random() * 20) + 40
-      }));
-    }, 10000);
+      loadStats();
+    }, 30000);
 
     return () => clearInterval(interval);
   }, []);
 
+  const loadStats = async () => {
+    try {
+      const { adminService } = await import('../services/admin');
+      const { apiService } = await import('../services/api');
+      
+      // Load users
+      const usersData = await adminService.getUsers();
+      const pendingUsers = usersData.filter(u => !u.is_approved && u.user_type === 'driver');
+      const recentlyActive = usersData.filter(u => {
+        if (!u.last_login) return false;
+        const lastLogin = new Date(u.last_login);
+        const now = new Date();
+        const diffMinutes = (now - lastLogin) / 60000;
+        return diffMinutes < 30; // Active in last 30 minutes
+      });
+      
+      // Load trips
+      const tripsData = await apiService.trips.getAll();
+      const activeTrips = tripsData.data.filter(t => t.status === 'in_progress');
+      
+      setStats({
+        totalUsers: usersData.length,
+        pendingApprovals: pendingUsers.length,
+        onlineUsers: recentlyActive.length,
+        activeTrips: activeTrips.length
+      });
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+    <div className="min-h-screen transition-colors duration-300">
       <Navbar />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -61,24 +84,26 @@ const Admin = () => {
             {/* Stats en temps réel */}
             <AdminStatsCards stats={stats} />
 
-            {/* Navigation Tabs simplifiée */}
-            <div className="flex space-x-1 mb-8 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl w-fit">
+            {/* Navigation Tabs - Professional */}
+            <div className="flex space-x-1 mb-8 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl w-fit shadow-sm">
               {[
-                { id: 'users', label: 'User Management', icon: '👥' },
-                { id: 'monitoring', label: 'Real-time Monitoring', icon: '📊' },
-                { id: 'analytics', label: 'Platform Analytics', icon: '📈' }
+                { id: 'users', label: 'User Management', icon: 'Users' },
+                { id: 'trips', label: 'Trips Management', icon: 'Map' },
+                { id: 'documents', label: 'Documents', icon: 'FileText' },
+                { id: 'monitoring', label: 'Real-time Monitoring', icon: 'Activity' },
+                { id: 'analytics', label: 'Platform Analytics', icon: 'TrendingUp' }
               ].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
+                  className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl font-medium transition-all duration-200 ${
                     activeTab === tab.id
-                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-lg'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-md'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-700/50'
                   }`}
                 >
-                  <span>{tab.icon}</span>
-                  <span>{tab.label}</span>
+                  <Icon name={tab.icon} size={18} />
+                  <span className="text-sm">{tab.label}</span>
                 </button>
               ))}
             </div>
@@ -86,6 +111,8 @@ const Admin = () => {
             {/* Contenu des onglets */}
             <div className="space-y-6">
               {activeTab === 'users' && <UserManagement />}
+              {activeTab === 'trips' && <TripsManagement />}
+              {activeTab === 'documents' && <DocumentsManagement />}
               {activeTab === 'monitoring' && <RealTimeMonitoring />}
               {activeTab === 'analytics' && <PlatformAnalytics />}
             </div>

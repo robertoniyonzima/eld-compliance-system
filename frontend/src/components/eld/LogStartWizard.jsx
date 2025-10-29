@@ -7,6 +7,8 @@ const LogStartWizard = ({ onLogCreated, currentTrip }) => {
   const [formData, setFormData] = useState({
     vehicle_number: '',
     trailer_number: '',
+    from_location: '',
+    to_location: '',
     total_miles_driving_today: 0,
     total_mileage_today: 0,
     shipping_documents: '',
@@ -36,26 +38,61 @@ const LogStartWizard = ({ onLogCreated, currentTrip }) => {
     try {
       setLoading(true);
       
-      // Créer le log quotidien
+      // Prepare log data with all required fields
       const logData = {
         date: new Date().toISOString().split('T')[0],
-        ...formData
+        vehicle_number: formData.vehicle_number || 'N/A',
+        trailer_number: formData.trailer_number || '',
+        from_location: formData.from_location || '',
+        to_location: formData.to_location || '',
+        total_miles_driving_today: formData.total_miles_driving_today || 0,
+        total_mileage_today: formData.total_mileage_today || 0,
+        shipping_documents: formData.shipping_documents || '',
+        remarks: formData.remarks || ''
       };
 
+      console.log('📝 Creating daily log with data:', logData);
       const response = await apiService.eld.createDailyLog(logData);
+      console.log('✅ Daily log created:', response.data);
       
-      // Créer le premier statut (Off Duty par défaut)
-      await apiService.eld.createStatusChange({
+      // Create first status (Off Duty by default)
+      const statusData = {
         status: 'off_duty',
-        location: 'Starting location',
+        location: currentTrip?.current_location_details?.city || 'Starting location',
         notes: 'Daily log started',
         start_time: new Date().toISOString()
-      });
+      };
+      
+      console.log('📝 Creating initial status:', statusData);
+      await apiService.eld.createStatusChange(statusData);
+      console.log('✅ Initial status created');
 
       onLogCreated(response.data);
     } catch (error) {
-      console.error('Error starting log:', error);
-      alert('Error starting daily log: ' + error.message);
+      console.error('❌ Error starting log:', error);
+      
+      // ✅ Check if it's a duplicate log error
+      if (error.response?.data?.existing_log) {
+        const message = error.response.data.message || 'You already have a daily log for today.';
+        const confirmed = window.confirm(
+          `${message}\n\nWould you like to continue with the existing log?`
+        );
+        
+        if (confirmed) {
+          // Fetch the existing log and continue
+          const existingLogId = error.response.data.daily_log_id;
+          try {
+            const existingLog = await apiService.eld.getDailyLog(existingLogId);
+            onLogCreated(existingLog.data);
+            return;
+          } catch (fetchError) {
+            console.error('Error fetching existing log:', fetchError);
+          }
+        }
+      }
+      
+      const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message;
+      alert('Error starting daily log: ' + errorMsg);
     } finally {
       setLoading(false);
     }
@@ -84,7 +121,7 @@ const LogStartWizard = ({ onLogCreated, currentTrip }) => {
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700">
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+      <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
         Start Daily ELD Log
       </h2>
 
@@ -148,27 +185,27 @@ const LogStartWizard = ({ onLogCreated, currentTrip }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Starting Odometer
+                  📍 From Location
                 </label>
                 <input
-                  type="number"
-                  value={formData.total_mileage_today}
-                  onChange={(e) => handleInputChange('total_mileage_today', parseInt(e.target.value) || 0)}
+                  type="text"
+                  value={formData.from_location}
+                  onChange={(e) => handleInputChange('from_location', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:text-white"
-                  placeholder="Current mileage"
+                  placeholder="e.g., Kigali, Rwanda"
                 />
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Today's Miles (Est.)
+                  📍 To Location (Destination)
                 </label>
                 <input
-                  type="number"
-                  value={formData.total_miles_driving_today}
-                  onChange={(e) => handleInputChange('total_miles_driving_today', parseInt(e.target.value) || 0)}
+                  type="text"
+                  value={formData.to_location}
+                  onChange={(e) => handleInputChange('to_location', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:text-white"
-                  placeholder="Estimated miles today"
+                  placeholder="e.g., Nairobi, Kenya"
                 />
               </div>
             </div>
@@ -184,13 +221,28 @@ const LogStartWizard = ({ onLogCreated, currentTrip }) => {
             {currentTrip && (
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                 <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
-                  Active Trip Detected
+                  🚛 Planned Trip Detected
                 </h4>
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  {currentTrip.pickup_location?.city} → {currentTrip.dropoff_location?.city}
-                </p>
-                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                  Distance: {currentTrip.total_distance} miles • Status: {currentTrip.status}
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-start">
+                    <span className="font-medium text-blue-800 dark:text-blue-200 w-16">From:</span>
+                    <span className="text-blue-700 dark:text-blue-300">
+                      {currentTrip.current_location_details?.address || currentTrip.current_location?.address || 'N/A'},
+                      {' '}{currentTrip.current_location_details?.city || currentTrip.current_location?.city || 'N/A'},
+                      {' '}{currentTrip.current_location_details?.state || currentTrip.current_location?.state || ''}
+                    </span>
+                  </div>
+                  <div className="flex items-start">
+                    <span className="font-medium text-blue-800 dark:text-blue-200 w-16">To:</span>
+                    <span className="text-blue-700 dark:text-blue-300">
+                      {currentTrip.dropoff_location_details?.address || currentTrip.dropoff_location?.address || 'N/A'},
+                      {' '}{currentTrip.dropoff_location_details?.city || currentTrip.dropoff_location?.city || 'N/A'},
+                      {' '}{currentTrip.dropoff_location_details?.state || currentTrip.dropoff_location?.state || ''}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                  Distance: {currentTrip.total_distance || 0} miles • Status: {currentTrip.status}
                 </p>
               </div>
             )}
@@ -240,7 +292,7 @@ const LogStartWizard = ({ onLogCreated, currentTrip }) => {
               <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
                 <p>• Vehicle: {formData.vehicle_number}</p>
                 {formData.trailer_number && <p>• Trailer: {formData.trailer_number}</p>}
-                {currentTrip && <p>• Active Trip: {currentTrip.pickup_location?.city} to {currentTrip.dropoff_location?.city}</p>}
+                {currentTrip && <p>• Active Trip: From {currentTrip.current_location_details?.city || currentTrip.current_location?.city} to {currentTrip.dropoff_location_details?.city || currentTrip.dropoff_location?.city}</p>}
                 <p>• Starting Odometer: {formData.total_mileage_today} miles</p>
               </div>
             </div>

@@ -127,14 +127,14 @@ const UserManagement = () => {
             placeholder="Search users..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
           />
           
           {/* Filtres */}
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-slate-900 dark:text-white"
           >
             <option value="all">All Users</option>
             <option value="active">Active</option>
@@ -156,8 +156,12 @@ const UserManagement = () => {
           filteredUsers.map((user) => (
             <div key={user.id} className="flex items-center justify-between p-4 bg-white/50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-white/80 dark:hover:bg-slate-700/50 transition-all group">
               <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-lg">
-                  {(user.first_name?.[0] || user.email?.[0] || 'U').toUpperCase()}
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-lg overflow-hidden">
+                  {user.profile_photo_url ? (
+                    <img src={user.profile_photo_url} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    (user.first_name?.[0] || user.email?.[0] || 'U').toUpperCase()
+                  )}
                 </div>
                 <div>
                   <h4 className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">

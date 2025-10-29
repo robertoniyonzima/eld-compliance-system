@@ -1,4 +1,4 @@
-// src/hooks/useAuth.jsx - VERSION CORRIGÉE
+// src/hooks/useAuth.jsx - VERSION AVEC AUTO-LOGOUT
 import { useState, useEffect, createContext, useContext } from 'react';
 import { authService } from '../services/auth';
 
@@ -10,6 +10,17 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     checkAuth();
+    
+    // Vérifier l'expiration du token toutes les 30 secondes
+    const tokenCheckInterval = setInterval(() => {
+      const token = localStorage.getItem('access_token');
+      if (token && !authService.isAuthenticated()) {
+        console.warn('⚠️ Token expired - Auto logout');
+        logout();
+      }
+    }, 30000); // Check every 30 seconds
+    
+    return () => clearInterval(tokenCheckInterval);
   }, []);
 
   const checkAuth = async () => {
@@ -52,12 +63,24 @@ export const AuthProvider = ({ children }) => {
     window.location.href = '/login';
   };
 
+  const refreshUser = async () => {
+    try {
+      const userData = await authService.getCurrentUser();
+      setUser(userData);
+      return userData;
+    } catch (error) {
+      console.error('Failed to refresh user:', error);
+      return null;
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
       login, 
       register, 
       logout, 
+      refreshUser,
       loading,
       isAuthenticated: !!user 
     }}>

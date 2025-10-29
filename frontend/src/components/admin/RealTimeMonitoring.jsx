@@ -1,47 +1,81 @@
-// src/components/admin/RealTimeMonitoring.jsx
+// src/components/admin/RealTimeMonitoring.jsx - REAL DATA VERSION
 import { useState, useEffect } from 'react';
 import GlassCard from '../ui/GlassCard';
+import { apiService } from '../../services/api';
+import { adminService } from '../../services/admin';
 
 const RealTimeMonitoring = () => {
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [activeTrips, setActiveTrips] = useState([]);
   const [systemAlerts, setSystemAlerts] = useState([]);
 
-  // Simulation de données en temps réel
+  // Load real data
   useEffect(() => {
-    const mockOnlineUsers = [
-      { id: 1, name: 'John Driver', role: 'driver', lastActive: '2 min ago', status: 'driving' },
-      { id: 2, name: 'Sarah Manager', role: 'manager', lastActive: '5 min ago', status: 'online' },
-      { id: 3, name: 'Mike Trucker', role: 'driver', lastActive: '1 min ago', status: 'on_duty' },
-      { id: 4, name: 'Robert Hauler', role: 'driver', lastActive: '30 sec ago', status: 'driving' },
-    ];
-
-    const mockActiveTrips = [
-      { id: 1, driver: 'John Driver', from: 'NYC', to: 'Chicago', progress: 65, status: 'on_time' },
-      { id: 2, driver: 'Mike Trucker', from: 'Chicago', to: 'LA', progress: 25, status: 'delayed' },
-    ];
-
-    const mockAlerts = [
-      { id: 1, type: 'hos_violation', message: 'HOS violation detected for driver Mike', time: '5 min ago', severity: 'high' },
-      { id: 2, type: 'system', message: 'Backup completed successfully', time: '1 hour ago', severity: 'low' },
-    ];
-
-    setOnlineUsers(mockOnlineUsers);
-    setActiveTrips(mockActiveTrips);
-    setSystemAlerts(mockAlerts);
-
-    // Simulation de mises à jour en temps réel
+    loadRealData();
+    
+    // Refresh every 30 seconds
     const interval = setInterval(() => {
-      setOnlineUsers(prev => 
-        prev.map(user => ({
-          ...user,
-          lastActive: 'just now'
-        }))
-      );
+      loadRealData();
     }, 30000);
 
     return () => clearInterval(interval);
   }, []);
+
+  const loadRealData = async () => {
+    try {
+      // Load users
+      const usersData = await adminService.getUsers();
+      const recentUsers = usersData
+        .filter(u => u.last_login)
+        .sort((a, b) => new Date(b.last_login) - new Date(a.last_login))
+        .slice(0, 10)
+        .map(u => ({
+          id: u.id,
+          name: `${u.first_name} ${u.last_name}`,
+          role: u.user_type,
+          lastActive: getTimeAgo(u.last_login),
+          status: u.is_active ? 'online' : 'offline'
+        }));
+      setOnlineUsers(recentUsers);
+
+      // Load active trips
+      const tripsData = await apiService.trips.getAll();
+      const activeTripsData = tripsData.data
+        .filter(t => t.status === 'in_progress')
+        .map(t => ({
+          id: t.id,
+          driver: t.driver_name || 'Unknown',
+          from: t.pickup_location_details?.city || 'Unknown',
+          to: t.dropoff_location_details?.city || 'Unknown',
+          progress: 50, // Could calculate based on time
+          status: 'on_time'
+        }));
+      setActiveTrips(activeTripsData);
+
+      // System alerts (could be from backend later)
+      setSystemAlerts([
+        { id: 1, type: 'info', message: `${recentUsers.length} users active`, time: 'now', severity: 'low' },
+        { id: 2, type: 'info', message: `${activeTripsData.length} trips in progress`, time: 'now', severity: 'low' }
+      ]);
+    } catch (error) {
+      console.error('Error loading real-time data:', error);
+    }
+  };
+
+  const getTimeAgo = (dateString) => {
+    if (!dateString) return 'Never';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  };
 
   const getStatusColor = (status) => {
     switch (status) {

@@ -1,6 +1,6 @@
-// src/pages/Register.jsx - PAGE COMPLÈTE MODERNE
+// src/pages/Register.jsx - WITH EMAIL VERIFICATION
 import { useState, useEffect } from 'react';
-import RegisterForm from '../components/auth/RegisterForm';
+import RegisterFormWithVerification from '../components/auth/RegisterFormWithVerification';
 
 const Register = () => {
   const [particles, setParticles] = useState([]);
@@ -191,7 +191,7 @@ const Register = () => {
                 </div>
 
                 {/* Registration Form Component */}
-                <RegisterForm />
+                <RegisterFormWithVerification />
 
                 {/* Divider */}
                 <div className="relative my-8">

@@ -25,7 +25,8 @@ export const authService = {
         email: user.email,
         first_name: user.first_name || 'Driver',
         last_name: user.last_name || '',
-        user_type: user.user_type || 'driver'
+        user_type: user.user_type || 'driver',
+        profile_photo_url: user.profile_photo_url || null
       };
       
       localStorage.setItem('user_data', JSON.stringify(userData));

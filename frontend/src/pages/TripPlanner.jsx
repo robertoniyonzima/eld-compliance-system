@@ -8,71 +8,8 @@ import InteractiveMap from '../components/trips/InteractiveMap';
 import HOSBreakPlanner from '../components/trips/HOSBreakPlanner';
 import TripHistory from '../components/trips/TripHistory';
 
-// Service de stockage local AVEC isolation par driver
-const tripStorage = {
-  saveTrip: (tripData, driverId) => {
-    console.log('💾 Saving trip for driver:', driverId);
-    const storageKey = `driver_trips_${driverId}`;
-    const trips = JSON.parse(localStorage.getItem(storageKey) || '[]');
-    
-    const tripWithMetadata = {
-      ...tripData,
-      id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-      driver_id: driverId,
-      created_by: driverId,
-      created_at: new Date().toISOString(),
-      status: 'planned',
-      updated_at: new Date().toISOString()
-    };
-    
-    trips.unshift(tripWithMetadata);
-    localStorage.setItem(storageKey, JSON.stringify(trips));
-    
-    console.log('✅ Trip saved. Total trips for this driver:', trips.length);
-    return tripWithMetadata;
-  },
-
-  getTrips: (driverId) => {
-    const storageKey = `driver_trips_${driverId}`;
-    const trips = JSON.parse(localStorage.getItem(storageKey) || '[]');
-    console.log(`📂 Loading trips for driver ${driverId}:`, trips.length, 'trips found');
-    return trips;
-  },
-
-  updateTripStatus: (tripId, driverId, status) => {
-    const storageKey = `driver_trips_${driverId}`;
-    const trips = JSON.parse(localStorage.getItem(storageKey) || '[]');
-    const updatedTrips = trips.map(trip => 
-      trip.id === tripId ? { 
-        ...trip, 
-        status, 
-        updated_at: new Date().toISOString() 
-      } : trip
-    );
-    localStorage.setItem(storageKey, JSON.stringify(updatedTrips));
-    return updatedTrips.find(trip => trip.id === tripId);
-  },
-
-  deleteTrip: (tripId, driverId) => {
-    const storageKey = `driver_trips_${driverId}`;
-    const trips = JSON.parse(localStorage.getItem(storageKey) || '[]');
-    const filteredTrips = trips.filter(trip => trip.id !== tripId);
-    localStorage.setItem(storageKey, JSON.stringify(filteredTrips));
-    return filteredTrips;
-  },
-
-  // Debug function
-  debugStorage: () => {
-    const allKeys = Object.keys(localStorage);
-    const tripKeys = allKeys.filter(key => key.startsWith('driver_trips_'));
-    console.log('🔍 Storage debug - All trip keys:', tripKeys);
-    
-    tripKeys.forEach(key => {
-      const trips = JSON.parse(localStorage.getItem(key) || '[]');
-      console.log(`   ${key}: ${trips.length} trips`);
-    });
-  }
-};
+// Import API service
+import { apiService } from '../services/api';
 
 const TripPlanner = () => {
   const { user } = useAuth(); // ✅ Utiliser votre hook d'auth
@@ -97,80 +34,58 @@ const TripPlanner = () => {
 
   const currentDriverId = getCurrentDriverId();
 
-  // Charger les trips au démarrage - SEULEMENT pour ce driver
+  // Charger les trips au démarrage depuis le backend
   useEffect(() => {
-    if (currentDriverId) {
-      loadTripsFromStorage();
-      tripStorage.debugStorage(); // Debug
+    if (user) {
+      loadTripsFromBackend();
     }
-  }, [currentDriverId]);
+  }, [user]);
 
-  const loadTripsFromStorage = () => {
-    if (!currentDriverId) {
-      console.error('❌ Cannot load trips: no driver ID');
-      return;
-    }
-
-    const savedTrips = tripStorage.getTrips(currentDriverId);
-    console.log('📥 Loaded trips for current driver:', savedTrips);
-    
-    setAllTrips(savedTrips);
-    
-    if (savedTrips.length > 0) {
-      const lastTrip = savedTrips[0];
-      setTripData(lastTrip);
-      setTripCreated(true);
-      setSelectedTripId(lastTrip.id);
-      setActiveTrip(lastTrip);
+  const loadTripsFromBackend = async () => {
+    try {
+      const response = await apiService.trips.getAll();
+      const trips = response.data || [];
+      console.log('📥 Loaded trips from backend:', trips.length);
       
-      const restoredRouteInfo = createRouteInfoFromBackend(lastTrip);
-      setRouteInfo(restoredRouteInfo);
-    } else {
-      console.log('📭 No trips found for this driver');
+      // ✅ Sort trips by most recent first (created_at or id descending)
+      const sortedTrips = trips.sort((a, b) => {
+        const dateA = new Date(a.created_at || a.id);
+        const dateB = new Date(b.created_at || b.id);
+        return dateB - dateA; // Most recent first
+      });
+      
+      setAllTrips(sortedTrips);
+      
+      if (sortedTrips.length > 0) {
+        const lastTrip = sortedTrips[0]; // Most recent trip
+        setTripData(lastTrip);
+        setTripCreated(true);
+        setSelectedTripId(lastTrip.id);
+        setActiveTrip(lastTrip);
+        
+        const restoredRouteInfo = createRouteInfoFromBackend(lastTrip);
+        setRouteInfo(restoredRouteInfo);
+      } else {
+        console.log('📭 No trips found for this driver');
+      }
+    } catch (error) {
+      console.error('❌ Error loading trips:', error);
+      setAllTrips([]);
     }
   };
 
   const handleTripCreated = (tripResponse) => {
-    if (!currentDriverId) {
-      console.error('❌ Cannot create trip: no driver ID');
-      return;
-    }
-
-    console.log('✅ Trip created in parent - FULL RESPONSE:', tripResponse);
+    console.log('✅ Trip created - FULL RESPONSE:', tripResponse);
     
     const trip = tripResponse.data || tripResponse;
-
-    // Créer newTripData
-    const newTripData = {
-      current_location: trip.current_location_details || trip.current_location || { 
-        address: '', city: '', state: '', zip_code: '',
-        latitude: trip.current_location_details?.latitude,
-        longitude: trip.current_location_details?.longitude
-      },
-      pickup_location: trip.pickup_location_details || trip.pickup_location || { 
-        address: '', city: '', state: '', zip_code: '',
-        latitude: trip.pickup_location_details?.latitude,
-        longitude: trip.pickup_location_details?.longitude
-      },
-      dropoff_location: trip.dropoff_location_details || trip.dropoff_location || { 
-        address: '', city: '', state: '', zip_code: '',
-        latitude: trip.dropoff_location_details?.latitude,
-        longitude: trip.dropoff_location_details?.longitude
-      },
-      current_cycle_used: trip.current_cycle_used || 0,
-      total_distance: trip.total_distance,
-      estimated_duration: trip.estimated_duration,
-      route_data: trip.route_data,
-    };
     
-    // ✅ Sauvegarder AVEC le vrai ID du driver
-    const savedTrip = tripStorage.saveTrip(newTripData, currentDriverId);
-    
-    setActiveTrip(savedTrip);
-    setTripData(savedTrip);
+    setActiveTrip(trip);
+    setTripData(trip);
     setTripCreated(true);
-    setSelectedTripId(savedTrip.id);
-    loadTripsFromStorage();
+    setSelectedTripId(trip.id);
+    
+    // Reload all trips from backend
+    loadTripsFromBackend();
 
     const backendRouteInfo = createRouteInfoFromBackend(trip);
     if (backendRouteInfo) {
@@ -189,43 +104,56 @@ const TripPlanner = () => {
     setRouteInfo(restoredRouteInfo);
   };
 
-  const handleTripStatusChange = (tripId, newStatus) => {
-    if (!currentDriverId) {
-      console.error('❌ Cannot update trip status: no driver ID');
-      return;
-    }
-
-    console.log(`🔄 Changing trip ${tripId} status to: ${newStatus}`);
-    
-    const updatedTrip = tripStorage.updateTripStatus(tripId, currentDriverId, newStatus);
-    loadTripsFromStorage();
-    
-    if (selectedTripId === tripId) {
-      setTripData(updatedTrip);
-      setActiveTrip(updatedTrip);
+  const handleTripStatusChange = async (tripId, newStatus) => {
+    try {
+      console.log(`🔄 Changing trip ${tripId} status to: ${newStatus}`);
+      
+      // Call appropriate backend endpoint
+      if (newStatus === 'in_progress') {
+        await apiService.trips.startTrip(tripId);
+      } else if (newStatus === 'completed') {
+        await apiService.trips.completeTrip(tripId);
+      } else {
+        // For other status changes, use update endpoint
+        await apiService.trips.update(tripId, { status: newStatus });
+      }
+      
+      // Reload trips from backend
+      await loadTripsFromBackend();
+      
+      // Update selected trip if it's the one being changed
+      if (selectedTripId === tripId) {
+        const response = await apiService.trips.getDetails(tripId);
+        const updatedTrip = response.data;
+        setTripData(updatedTrip);
+        setActiveTrip(updatedTrip);
+      }
+    } catch (error) {
+      console.error('❌ Error updating trip status:', error);
+      alert('Failed to update trip status: ' + (error.response?.data?.error || error.message));
     }
   };
 
-  const handleTripDelete = (tripId) => {
-    if (!currentDriverId) {
-      console.error('❌ Cannot delete trip: no driver ID');
-      return;
-    }
-
-    if (window.confirm('Are you sure you want to delete this trip?')) {
-      const remainingTrips = tripStorage.deleteTrip(tripId, currentDriverId);
-      setAllTrips(remainingTrips);
-      
-      if (selectedTripId === tripId) {
-        if (remainingTrips.length > 0) {
-          handleTripSelect(remainingTrips[0]);
-        } else {
-          setTripData(null);
-          setRouteInfo(null);
-          setTripCreated(false);
-          setSelectedTripId(null);
-          setActiveTrip(null);
+  const handleTripDelete = async (tripId) => {
+    if (window.confirm('Are you sure you want to cancel this trip?')) {
+      try {
+        // Mark as cancelled instead of deleting
+        await handleTripStatusChange(tripId, 'cancelled');
+        
+        if (selectedTripId === tripId) {
+          const remainingTrips = allTrips.filter(t => t.id !== tripId && t.status !== 'cancelled');
+          if (remainingTrips.length > 0) {
+            handleTripSelect(remainingTrips[0]);
+          } else {
+            setTripData(null);
+            setRouteInfo(null);
+            setTripCreated(false);
+            setSelectedTripId(null);
+            setActiveTrip(null);
+          }
         }
+      } catch (error) {
+        console.error('❌ Error cancelling trip:', error);
       }
     }
   };
@@ -244,7 +172,12 @@ const TripPlanner = () => {
     let distance, duration, coordinates, route;
     
     distance = parseFloat(trip.total_distance) || 0;
-    duration = trip.estimated_duration ? (trip.estimated_duration / 3600) : 0;
+    // Use estimated_duration_seconds if available (from backend serializer)
+    duration = trip.estimated_duration_seconds 
+      ? (trip.estimated_duration_seconds / 3600) 
+      : trip.estimated_duration 
+        ? (trip.estimated_duration / 3600) 
+        : 0;
 
     if (trip.route_data) {
       if (trip.route_data.coordinates) {
@@ -307,7 +240,7 @@ const TripPlanner = () => {
   // ✅ Afficher un message si pas d'utilisateur
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="text-2xl font-bold text-slate-900 dark:text-white mb-4">
             🔐 Authentication Required
@@ -321,7 +254,7 @@ const TripPlanner = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+    <div className="min-h-screen">
       <Navbar />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -382,8 +315,12 @@ const TripPlanner = () => {
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               <div className="xl:col-span-2 space-y-6">
-                <TripWizard onTripCreated={handleTripCreated} />
+                {/* Show TripWizard only when no trip is selected */}
+                {!tripCreated && (
+                  <TripWizard onTripCreated={handleTripCreated} />
+                )}
                 
+                {/* Show HOS Break Planner when trip is selected */}
                 {tripCreated && (
                   <HOSBreakPlanner 
                     tripData={tripData}
@@ -391,6 +328,7 @@ const TripPlanner = () => {
                   />
                 )}
 
+                {/* Always show Trip History */}
                 <TripHistory 
                   trips={allTrips}
                   selectedTripId={selectedTripId}
@@ -401,6 +339,7 @@ const TripPlanner = () => {
                 />
               </div>
               
+              {/* Always show Interactive Map */}
               <div className="xl:col-span-1">
                 <InteractiveMap 
                   tripData={tripData}

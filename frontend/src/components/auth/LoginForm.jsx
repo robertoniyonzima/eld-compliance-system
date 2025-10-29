@@ -205,17 +205,12 @@ const LoginForm = () => {
             Remember me
           </span>
         </label>
-        <button 
-          type="button"
-          className={`text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors font-medium ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-          onClick={(e) => {
-            e.preventDefault();
-            alert('Password reset feature coming soon');
-          }}
-          disabled={loading}
+        <a 
+          href="/forgot-password"
+          className={`text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors font-medium ${loading ? 'opacity-50 pointer-events-none' : ''}`}
         >
           Forgot password?
-        </button>
+        </a>
       </div>
       
       {/* Sign In Button */}

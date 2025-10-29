@@ -11,6 +11,8 @@ class DutyStatusChangeSerializer(serializers.ModelSerializer):
 class DailyLogSerializer(serializers.ModelSerializer):
     status_changes = DutyStatusChangeSerializer(many=True, read_only=True)
     driver_name = serializers.CharField(source='driver.get_full_name', read_only=True)
+    driver_first_name = serializers.CharField(source='driver.first_name', read_only=True)
+    driver_last_name = serializers.CharField(source='driver.last_name', read_only=True)
     carrier_name = serializers.CharField(source='carrier.name', read_only=True)
     
     class Meta:
@@ -19,6 +21,7 @@ class DailyLogSerializer(serializers.ModelSerializer):
         read_only_fields = (
             'driver', 'carrier', 'main_office_address', 
             'home_terminal_address', 'is_certified', 'certified_at', 
+            'is_finalized', 'finalized_at',
             'created_at', 'updated_at'
         )
 

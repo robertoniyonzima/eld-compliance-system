@@ -8,7 +8,7 @@ import RecentTrips from '../../components/dashboard/RecentTrips';
 
 const DriverDashboard = () => {
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+    <div className="min-h-screen transition-colors duration-300">
       <Navbar />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -22,7 +22,7 @@ const DriverDashboard = () => {
                 Driver Dashboard
               </h1>
               <p className="text-slate-600 dark:text-slate-400 mt-2">
-                Welcome to your driving workspace
+                Welcome to your driving workspace - All data is live from database
               </p>
             </div>
 

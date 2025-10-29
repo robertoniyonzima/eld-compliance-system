@@ -1,6 +1,7 @@
 // src/hooks/useELD.js
 import { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
+import { getLocalISOString } from '../utils/timezone';
 
 export const useELD = (date = new Date()) => {
   const [currentStatus, setCurrentStatus] = useState('off_duty');
@@ -12,7 +13,8 @@ export const useELD = (date = new Date()) => {
   // Charger le log du jour
   useEffect(() => {
     loadDailyLog();
-  }, [date]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date.toISOString().split('T')[0]]); // Only re-run when date changes
 
   const loadDailyLog = async () => {
     try {
@@ -31,10 +33,14 @@ export const useELD = (date = new Date()) => {
       
       if (logForDate) {
         setCurrentLog(logForDate);
-        setStatusHistory(logForDate.status_changes || []);
+        // ✅ Sort status history by most recent first
+        const sortedHistory = (logForDate.status_changes || []).sort((a, b) => 
+          new Date(b.start_time) - new Date(a.start_time)
+        );
+        setStatusHistory(sortedHistory);
         
         // Déterminer le statut actuel (le dernier sans end_time)
-        const activeStatus = logForDate.status_changes?.find(change => !change.end_time);
+        const activeStatus = sortedHistory.find(change => !change.end_time);
         if (activeStatus) {
           setCurrentStatus(activeStatus.status);
         } else {
@@ -59,11 +65,12 @@ export const useELD = (date = new Date()) => {
       setError(null);
       
       // Créer un changement de statut
+      // ✅ CRITICAL: Use local time, NOT UTC
       const statusChangeData = {
         status: newStatus,
         location: location,
         notes: notes,
-        start_time: new Date().toISOString()
+        start_time: getLocalISOString() // Use local time without timezone conversion
       };
 
       const response = await apiService.eld.createStatusChange(statusChangeData);

@@ -33,6 +33,14 @@ class DailyLog(models.Model):
     trailer_number = models.CharField(max_length=50, blank=True, null=True, verbose_name="Trailer Number")
     home_terminal_address = models.TextField(verbose_name="Home Terminal Address")
     
+    # ✅ FROM and TO locations (captured from Trip Planner)
+    from_location = models.CharField(max_length=255, blank=True, null=True, verbose_name="From Location")
+    to_location = models.CharField(max_length=255, blank=True, null=True, verbose_name="To Location")
+    
+    # ✅ Daily log status
+    is_finalized = models.BooleanField(default=False, verbose_name="Log Finalized")
+    finalized_at = models.DateTimeField(null=True, blank=True, verbose_name="Finalized At")
+    
     # Section Shipping Documents
     shipping_documents = models.TextField(
         blank=True, 

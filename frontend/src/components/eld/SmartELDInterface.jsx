@@ -95,6 +95,12 @@ const SmartELDInterface = ({ date, currentTrip }) => {
       return;
     }
 
+    // ✅ Require notes for On Duty status
+    if (selectedNewStatus === 'on_duty' && !notesInput.trim()) {
+      alert('Please describe what you are doing while on duty (e.g., maintenance, loading, fueling)');
+      return;
+    }
+
     try {
       setActionLoading(true);
       
@@ -175,6 +181,9 @@ const SmartELDInterface = ({ date, currentTrip }) => {
     );
   }
 
+  // Check if log is finalized
+  const isLogFinalized = currentLog?.is_finalized || false;
+
   return (
     <div className="space-y-6">
       {/* Current Status Banner */}
@@ -215,6 +224,23 @@ const SmartELDInterface = ({ date, currentTrip }) => {
         </div>
       </div>
 
+      {/* ✅ Log Finalized Warning Banner */}
+      {isLogFinalized && (
+        <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-700 rounded-2xl p-4">
+          <div className="flex items-center space-x-3">
+            <div className="text-3xl">🔒</div>
+            <div>
+              <h3 className="font-bold text-green-800 dark:text-green-200">
+                Log Finalized
+              </h3>
+              <p className="text-sm text-green-700 dark:text-green-300">
+                This log has been finalized. No further status changes are allowed.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Quick Status Change Buttons */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -226,7 +252,7 @@ const SmartELDInterface = ({ date, currentTrip }) => {
             <button
               key={status.id}
               onClick={() => handleStatusChangeClick(status.id)}
-              disabled={currentStatus === status.id || actionLoading}
+              disabled={currentStatus === status.id || actionLoading || isLogFinalized}
               className={`p-4 rounded-xl text-center transition-all duration-200 ${
                 currentStatus === status.id
                   ? `${status.color} text-white shadow-lg scale-105`
@@ -330,7 +356,7 @@ const SmartELDInterface = ({ date, currentTrip }) => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Current Location *
+                  📍 Current Location *
                 </label>
                 <input
                   type="text"
@@ -342,18 +368,41 @@ const SmartELDInterface = ({ date, currentTrip }) => {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Notes (Optional)
-                </label>
-                <textarea
-                  value={notesInput}
-                  onChange={(e) => setNotesInput(e.target.value)}
-                  rows="2"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:text-white"
-                  placeholder="Any additional information..."
-                />
-              </div>
+              {/* 📝 Show Notes field ONLY for On Duty status */}
+              {selectedNewStatus === 'on_duty' && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-300 dark:border-amber-700 rounded-lg p-4">
+                  <label className="block text-sm font-medium text-amber-800 dark:text-amber-300 mb-2">
+                    📝 What are you doing? (Required for On Duty)
+                  </label>
+                  <textarea
+                    value={notesInput}
+                    onChange={(e) => setNotesInput(e.target.value)}
+                    rows="3"
+                    className="w-full px-3 py-2 border border-amber-300 dark:border-amber-600 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:bg-slate-700 dark:text-white"
+                    placeholder="Example: Vehicle maintenance, Loading cargo, Fueling, Pre-trip inspection, Paperwork..."
+                    required
+                  />
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-2">
+                    💡 Describe your on-duty activity. This will be saved and visible in the grid.
+                  </p>
+                </div>
+              )}
+              
+              {/* Optional notes for other statuses */}
+              {selectedNewStatus !== 'on_duty' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    📝 Notes (Optional)
+                  </label>
+                  <textarea
+                    value={notesInput}
+                    onChange={(e) => setNotesInput(e.target.value)}
+                    rows="2"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:text-white"
+                    placeholder="Any additional information..."
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end space-x-3 mt-6">

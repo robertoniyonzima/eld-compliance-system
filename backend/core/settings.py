@@ -91,18 +91,42 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://localhost:5173"
+    "http://localhost:5173",
+    "http://localhost:39745",
+    "http://127.0.0.1:39745"
 ]
 
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Africa/Kigali'  # UTC+2 - Kigali/Rwanda timezone
 USE_I18N = True
-USE_TZ = True
+USE_TZ = False  # ✅ DISABLED - Store times as-is from frontend (no UTC conversion)
 
 STATIC_URL = '/static/'
+
+# Media files (uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
+
+# Email Configuration
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'rortonexpensetracker@gmail.com'
+EMAIL_HOST_PASSWORD = 'hbvd kzpr ydmp pwwx'
+DEFAULT_FROM_EMAIL = 'ELD Compliance System <rortonexpensetracker@gmail.com>'
+
+# Cache Configuration (for verification codes)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
 DEBUG = True

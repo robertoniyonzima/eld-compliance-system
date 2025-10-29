@@ -1,24 +1,26 @@
-// src/App.jsx - AVEC BACKGROUND FIXE
+// src/App.jsx - WITH EMAIL VERIFICATION
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { ThemeProvider } from './hooks/useTheme';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
 import DriverDashboard from './pages/dashboard/DriverDashboard';
 import ELDLogs from './pages/ELDLogs';
 import TripPlanner from './pages/TripPlanner';
 import Settings from './pages/Settings';
 import Admin from './pages/Admin';
 import LoadingSpinner from './components/ui/LoadingSpinner';
+import BackgroundPattern from './components/ui/BackgroundPattern';
 import './styles/globals.css';
-
+import ManagerDashboard from './pages/dashboard/ManagerDashboard';
 // Pages dashboard
-const ManagerDashboard = () => (
-  <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-8">
-    <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Manager Dashboard</h1>
-    <p className="text-slate-600 dark:text-slate-400">Manager interface</p>
-  </div>
-);
+// const ManagerDashboard = () => (
+//   <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-8">
+//     <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Manager Dashboard</h1>
+//     <p className="text-slate-600 dark:text-slate-400">Manager interface</p>
+//   </div>
+// );
 
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { user, loading } = useAuth();
@@ -68,6 +70,7 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/" element={<DashboardRedirect />} />
       
       <Route 
@@ -130,9 +133,17 @@ function App() {
     <Router>
       <ThemeProvider>
         <AuthProvider>
-          {/* ⭐ BACKGROUND FIXE POUR TOUTE L'APPLICATION */}
-          <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
-            <AppRoutes />
+          {/* ⭐ BACKGROUND WITH PROFESSIONAL PATTERN */}
+          <div className="min-h-screen relative">
+            {/* Background Pattern - Always visible behind everything */}
+            <div className="fixed inset-0 bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+              <BackgroundPattern />
+            </div>
+            
+            {/* Content - Above background */}
+            <div className="relative">
+              <AppRoutes />
+            </div>
           </div>
         </AuthProvider>
       </ThemeProvider>

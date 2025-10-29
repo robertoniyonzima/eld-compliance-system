@@ -29,6 +29,7 @@ class CustomUser(AbstractUser):
     license_number = models.CharField(max_length=50, blank=True, null=True)
     license_state = models.CharField(max_length=2, blank=True, null=True)
     email = models.EmailField(unique=True)
+    profile_photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
     
     # ⭐️ IMPORTANT: Ajouter related_name pour éviter les conflits
     groups = models.ManyToManyField(
@@ -52,7 +53,8 @@ class CustomUser(AbstractUser):
     REQUIRED_FIELDS = ['username']
     
     def save(self, *args, **kwargs):
-        if self.user_type == 'driver' and not self.pk:
+        # ✅ ALL new users need approval (driver, manager, admin)
+        if not self.pk:  # New user
             self.is_approved = False
             self.is_active = False
         super().save(*args, **kwargs)

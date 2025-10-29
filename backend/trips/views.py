@@ -15,9 +15,16 @@ class TripViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.user_type == 'driver':
-            return Trip.objects.filter(driver=user)
-        elif user.user_type in ['manager', 'admin']:
-            return Trip.objects.filter(driver__company=user.company)
+            # Driver voit ses trips, triés par date (plus récent en premier)
+            return Trip.objects.filter(driver=user).order_by('-created_at', '-id')
+        elif user.user_type == 'admin':
+            # Admin voit tous les trips, triés par date (plus récent en premier)
+            return Trip.objects.all().order_by('-created_at', '-id')
+        elif user.user_type == 'manager':
+            # ✅ Manager voit TOUS les trips (comme admin)
+            # Si vous avez plusieurs compagnies, décommentez la ligne suivante:
+            # return Trip.objects.filter(driver__company=user.company).order_by('-created_at', '-id')
+            return Trip.objects.all().order_by('-created_at', '-id')
         return Trip.objects.none()
     
     def create(self, request):

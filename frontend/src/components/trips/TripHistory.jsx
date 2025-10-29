@@ -41,23 +41,30 @@ const TripHistory = ({
   // ✅ CORRECTION: Calcul FIABLE de la durée
   const getDurationHours = (trip) => {
     console.log('🕒 Trip duration data:', {
+      estimated_duration_seconds: trip.estimated_duration_seconds,
       estimated_duration: trip.estimated_duration,
       total_distance: trip.total_distance
     });
     
-    // 1. Essayer estimated_duration (secondes → heures)
+    // 1. Try estimated_duration_seconds from backend
+    if (trip.estimated_duration_seconds && !isNaN(trip.estimated_duration_seconds)) {
+      const hours = trip.estimated_duration_seconds / 3600;
+      return hours.toFixed(1);
+    }
+    
+    // 2. Try estimated_duration (might be in seconds already)
     if (trip.estimated_duration && !isNaN(trip.estimated_duration)) {
       const hours = trip.estimated_duration / 3600;
       return hours.toFixed(1);
     }
     
-    // 2. Fallback: calcul à partir de la distance
+    // 3. Fallback: calculate from distance
     if (trip.total_distance && !isNaN(trip.total_distance)) {
-      const hours = trip.total_distance / 55; // 55 mph moyenne
+      const hours = trip.total_distance / 55; // 55 mph average
       return hours.toFixed(1);
     }
     
-    // 3. Fallback ultime
+    // 4. Final fallback
     return '0';
   };
 
@@ -117,12 +124,12 @@ const TripHistory = ({
                     </div>
                     <div>
                       <h4 className="font-semibold text-gray-900 dark:text-white text-sm">
-                        {trip.current_location?.city || 'Unknown'} → {trip.dropoff_location?.city || 'Unknown'}
+                        {trip.current_location_details?.city || trip.current_location?.city || 'Unknown'} → {trip.dropoff_location_details?.city || trip.dropoff_location?.city || 'Unknown'}
                         {!isOwner && <span className="text-xs text-gray-500 ml-2">(Other Driver)</span>}
                       </h4>
                       <p className="text-xs text-gray-600 dark:text-gray-400">
                         {formatDate(trip.created_at)}
-                        {trip.driver_id && <span> • Driver: {trip.driver_id}</span>}
+                        {trip.driver_name && <span> • {trip.driver_name}</span>}
                       </p>
                     </div>
                   </div>
