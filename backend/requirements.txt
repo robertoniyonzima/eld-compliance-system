@@ -1,13 +1,53 @@
-# backend/requirements.txt
+# ============================================
+# ELD Compliance System - Backend Requirements
+# Optimized for Render.com deployment
+# ============================================
+
+# Core Django Framework
 Django==4.2.7
+
+# Django REST Framework & Extensions
 djangorestframework==3.14.0
-django-cors-headers==4.3.1
 djangorestframework-simplejwt==5.3.0
-python-decouple==3.8
-psycopg2-binary==2.9.7
-drf-yasg==1.21.5
-Pillow==10.0.1
-cryptography==41.0.7
-geopy==2.3.0
-requests==2.31.0
 django-filter==23.3
+
+# CORS Support (for frontend communication)
+django-cors-headers==4.3.1
+
+# API Documentation (Swagger/OpenAPI)
+drf-yasg==1.21.5
+
+# Database
+psycopg2-binary==2.9.9  # PostgreSQL adapter (updated)
+dj-database-url==2.1.0  # Database URL parser for Render
+
+# Environment Variables
+python-decouple==3.8
+
+# Image Processing (for profile photos)
+Pillow==10.1.0  # Updated for security
+
+# PDF Generation (for ELD logs and trip reports)
+reportlab==4.0.7
+
+# Geolocation & Mapping
+geopy==2.4.1  # Updated
+
+# HTTP Requests (for OSRM routing API)
+requests==2.31.0
+
+# Security & Encryption
+cryptography==41.0.7
+
+# WSGI Server for Production (Render requirement)
+gunicorn==21.2.0
+
+# Whitenoise for Static Files (Render best practice)
+whitenoise==6.6.0
+
+# Task Queue (optional, for background jobs)
+# celery==5.3.4
+# redis==5.0.1
+
+# Monitoring & Error Tracking (optional)
+# sentry-sdk==1.38.0
