@@ -532,4 +532,4 @@ For support, email support@eldcompliance.com or open an issue on GitHub.
 
 **Built with ❤️ for professional truck drivers and fleet managers**
 
-© 2024 ELD Compliance System. All rights reserved.
+© 2025 ELD Compliance System. All rights reserved.
