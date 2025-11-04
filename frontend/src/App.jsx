@@ -129,8 +129,18 @@ const AppRoutes = () => {
 };
 
 function App() {
+  // Determine basename based on environment
+  const getBasename = () => {
+    // Only use basename on Vercel production
+    if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+      return '/frontendELDsystem';
+    }
+    // Local development - no basename
+    return '/';
+  };
+
   return (
-    <Router>
+    <Router basename={getBasename()}>
       <ThemeProvider>
         <AuthProvider>
           {/* ⭐ BACKGROUND WITH PROFESSIONAL PATTERN */}
