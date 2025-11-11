@@ -203,6 +203,65 @@ npm run dev
 
 ---
 
+
+Database Configuration and Initial Data
+
+This directory contains the complete PostgreSQL database dump for the eld_system application. This file includes the full schema and all current data, making it suitable for quick local setup or initial deployment testing.
+
+1. 🚨 Important Notes
+
+    Dump File: database/database.sql
+
+    Content: This file contains both the schema (CREATE TABLE) and all data (INSERT INTO) for all 19 tables, including user records, logs, and application history.
+
+    Security: This dump contains sensitive data (such as hashed passwords and user activity). Exercise caution when sharing this repository.
+
+2. ⚙️ Database Credentials
+
+To connect to PostgreSQL locally, use the following credentials for the database that must be created before importing the data:
+Parameter	Value
+Database Name	eld_system
+User	eld_user
+Password	eld_password_123
+Host	localhost
+Port	5432
+
+3. 🚀 How to Import the Database
+
+Follow these steps to restore the database from the SQL dump file.
+
+A. Create the Database and User
+
+You must first create the database and the owner user if they do not already exist on your PostgreSQL server.
+Bash
+
+# 1. Connect as the PostgreSQL superuser (e.g., 'postgres'):
+psql -U postgres
+
+# 2. Inside the psql prompt, run these commands:
+CREATE USER eld_user WITH PASSWORD 'eld_password_123';
+CREATE DATABASE eld_system WITH OWNER eld_user;
+\q
+
+B. Load the Data from the Dump File
+
+Navigate to the root directory of your project (where the database/ folder is located) and run the psql command to load the SQL file:
+Bash
+
+# Load the full dump file into the newly created database
+psql -U eld_user -h localhost -p 5432 -d eld_system < database/database.sql
+
+The console will display the output of all the executed CREATE and INSERT commands.
+
+4. 🔑 Default User Access
+
+Since this is a full dump, the existing Admin and Manager users are included. You can log in using the credentials used when the database was backed up.
+
+    Tables to check for credentials: users_customuser and auth_group.
+
+
+
+
 ## 📁 Project Structure
 
 ```
